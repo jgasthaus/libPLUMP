@@ -1,13 +1,13 @@
 import libplump
 
-#restaurant = libplump.SimpleFullRestaurant()
-restaurant = libplump.ReinstantiatingCompactRestaurant()
+restaurant = libplump.KneserNeyRestaurant()
+#restaurant = libplump.ReinstantiatingCompactRestaurant()
 nodeManager = libplump.SimpleNodeManager(restaurant.getFactory())
 parameters = libplump.SimpleParameters()
 
 #seq = libplump.vectori(range(10))
 #seq = libplump.vectori([0]*10)
-seq = libplump.vectori(map(ord,'oacac'))
+seq = libplump.VectorInt(map(ord,'oacac'))
 numTypes = max(seq)
 
 model = libplump.HPYPModel(seq,nodeManager, restaurant, parameters, numTypes)

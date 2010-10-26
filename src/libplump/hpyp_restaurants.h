@@ -25,73 +25,9 @@
 #include "libplump/pool.h"
 #include "libplump/node_manager.h" // for IPayloadFactory
 #include "libplump/serialization.h"
+#include "libplump/hpyp_restaurant_interface.h"
 
 namespace gatsby { namespace libplump {
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////   INTERFACES   ////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-class IHPYPBaseRestaurant {
-  public:
-    typedef std::vector<e_type> TypeVector;
-    typedef TypeVector::iterator TypeVectorIterator;
-    virtual ~IHPYPBaseRestaurant() {}
-    virtual l_type getC(void* payloadPtr, e_type type) const = 0;
-    virtual l_type getC(void* payloadPtr) const = 0;
-    virtual l_type getT(void* payloadPtr, e_type type) const = 0;
-    virtual l_type getT(void* payloadPtr) const = 0;
-    virtual double computeProbability(void*  payloadPtr,
-                                      e_type type, 
-                                      double parentProbability,
-                                      double discount, 
-                                      double concentration) const = 0;
-    virtual TypeVector getTypeVector(void* payloadPtr) const = 0;
-    virtual const IPayloadFactory& getFactory() const = 0;
-    virtual void updateAfterSplit(void* longerPayload, 
-                                  void* shorterPayload, 
-                                  double discountBeforeSplit, 
-                                  double discountAfterSplit,
-                                  bool parentOnly = false) const = 0;
-    virtual std::string toString(void* payloadPtr) const = 0;
-    virtual bool checkConsistency(void* payloadPtr) const = 0;
-};
-
-
-class IAddRestaurant : public IHPYPBaseRestaurant {
-  public:
-    virtual ~IAddRestaurant() {}
-    virtual bool addCustomer(void*  payloadPtr, 
-                             e_type type, 
-                             double parentProbability, 
-                             double discount, 
-                             double concentration,
-                             void*  additionalData = NULL) const = 0;
-};
-
-
-class IAddRemoveRestaurant : public IAddRestaurant {
-  public:
-    virtual ~IAddRemoveRestaurant() {}
-    virtual bool removeCustomer(void* payloadPtr, 
-                                e_type type,
-                                double discount,
-                                void* additionalData) const = 0;
-
-    virtual void* createAdditionalData(void* payloadPtr, 
-                                       double discount, 
-                                       double concentration) const = 0;
-
-    /**
-     * Free the memory allocated for additionalData. 
-     *
-     * This should be called for every piece of additionalData 
-     * created using createAdditionalData.
-     */
-    virtual void freeAdditionalData(void* additionalData) const = 0;
-};
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////   CLASS DECLARATIONS   ////////////////////////////////
@@ -330,7 +266,7 @@ class BaseCompactRestaurant : public IAddRemoveRestaurant {
   public:
     BaseCompactRestaurant() : payloadFactory() {}
 
-    ~BaseCompactRestaurant() {}
+    virtual ~BaseCompactRestaurant() {}
 
     l_type getC(void* payloadPtr, e_type type) const;
     l_type getC(void* payloadPtr) const;
@@ -445,6 +381,92 @@ class StirlingCompactRestaurant : public BaseCompactRestaurant {
                                double concentration) const;
 
     void freeAdditionalData(void* additionalData) const;
+};
+
+
+
+class KneserNeyRestaurant : public IAddRemoveRestaurant {
+  public:
+
+    KneserNeyRestaurant() : payloadFactory() {}
+
+
+    ~KneserNeyRestaurant() {}
+
+    l_type getC(void* payloadPtr, e_type type) const;
+    l_type getC(void* payloadPtr) const;
+    l_type getT(void* payloadPtr, e_type type) const;
+    l_type getT(void* payloadPtr) const;
+    
+    double computeProbability(void*  payloadPtr,
+                              e_type type, 
+                              double parentProbability,
+                              double discount, 
+                              double concentration) const;
+    
+    TypeVector getTypeVector(void* payloadPtr) const;
+    
+    const IPayloadFactory& getFactory() const;
+    
+    void updateAfterSplit(void* longerPayloadPtr, 
+                          void* shorterPayloadPtr, 
+                          double discountBeforeSplit, 
+                          double discountAfterSplit, 
+                          bool parentOnly = false) const;
+
+    bool addCustomer(void*  payloadPtr, 
+                     e_type type, 
+                     double parentProbability, 
+                     double discount, 
+                     double concentration,
+                     void* additionalData = NULL) const;
+
+    bool removeCustomer(void* payloadPtr, 
+                        e_type type,
+                        double discount,
+                        void* additionalData) const;
+
+    void* createAdditionalData(void* payloadPtr, 
+                               double discount, 
+                               double concentration) const;
+
+    void freeAdditionalData(void* additionalData) const;
+    
+    std::string toString(void* payloadPtr) const;
+    
+    bool checkConsistency(void* payloadPtr) const;
+    
+  private:
+    
+    class Payload : public PoolObject<Payload> {
+      public:
+        // per type: cw
+        typedef std::map<e_type, l_type> TableMap;
+
+        Payload() : tableMap(), sumCustomers(0) {}
+
+        TableMap tableMap;
+        l_type sumCustomers;
+      
+        void serialize(InArchive & ar, const unsigned int version);
+        void serialize(OutArchive & ar, const unsigned int version);
+    };
+    
+    class PayloadFactory : public IPayloadFactory {
+      
+      void* make() const {
+        return new Payload();
+      };
+      
+      void recycle(void* payloadPtr) const {
+        delete (Payload*)payloadPtr;
+      }
+    
+      void save(void* payloadPtr, OutArchive& oa) const;
+      void* load(InArchive& ia) const;
+    };
+
+    const PayloadFactory payloadFactory;
 };
 
 

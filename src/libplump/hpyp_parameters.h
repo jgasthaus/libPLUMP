@@ -27,6 +27,7 @@
 
 #include "libplump/config.h"
 #include "libplump/context_tree.h" // for WrappedNodeList
+#include "libplump/utils.h" // for WrappedNodeList
 
 namespace gatsby { namespace libplump {
 
@@ -64,7 +65,7 @@ class IParameters {
  * A basic implementation of a class that stores per-level 
  * discount and concentration parameters.
  */
-class SimpleParameters : implements IParameters {
+class SimpleParameters : public IParameters {
   public:
     
     SimpleParameters();

@@ -23,7 +23,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "libplump/config.h"
-#include "libplump/hpyp_restaurants.h"
+#include "libplump/hpyp_restaurant_interface.h"
 #include "libplump/serialization.h"
 
 namespace gatsby { namespace libplump {
