@@ -65,6 +65,9 @@ IParameters* getParameters(po::variables_map& vm) {
 
 IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
   switch(vm["restaurant"].as<int>()) {
+    case 0:
+      cerr << "getRestaurant(): Using KneserNeyRestaurant" << endl;
+      return new KneserNeyRestaurant();
     case 1:
       cerr << "getRestaurant(): Using SimpleFullRestaurant" << endl;
       return new SimpleFullRestaurant();
@@ -354,7 +357,7 @@ int main(int argc, char* argv[]) {
     ("head",po::value<int>()->default_value(0), "If given, cuts input to this number of symbols")
     ("mode", po::value<int>()->default_value(1), "1: particle filter, 2: no fragment, 3: fragment")
     ("restaurant", po::value<int>()->default_value(1),
-     "1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching")
+     "0:KN, 1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching")
     ("sample",po::value<int>()->default_value(0), "Number of Gibbs iteration (incremental mode)")
     ("burn-in",po::value<int>()->default_value(0), "Number of Gibbs iterations for burn in")
     ("samples,s",po::value<int>()->default_value(1), "Number of samples used for prediction")

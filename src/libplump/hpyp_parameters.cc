@@ -1,6 +1,7 @@
 #include "libplump/hpyp_parameters.h"
 #include <cmath> // for pow
 #include "libplump/context_tree.h" // for WrappedNodeList
+#include "libplump/utils.h" // for tracer
 
 namespace gatsby { namespace libplump {
 

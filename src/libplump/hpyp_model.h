@@ -26,9 +26,9 @@
 #include <boost/shared_ptr.hpp>
 
 #include "libplump/config.h"
-#include "libplump/node_manager.h"
 #include "libplump/context_tree.h"
-#include "libplump/hpyp_restaurants.h"
+#include "libplump/node_manager_interface.h"
+#include "libplump/hpyp_restaurant_interface.h"
 #include "libplump/hpyp_parameters.h"
 
 namespace gatsby { namespace libplump {

@@ -1150,4 +1150,229 @@ void StirlingCompactRestaurant::freeAdditionalData(void* additionalData) const {
 
 }
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////   class KneserKeyRestaurant   ///////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+l_type KneserNeyRestaurant::getC(void* payloadPtr, e_type type) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  if (it != payload.tableMap.end()) {
+    return (*it).second; // cw
+  } else {
+    return 0;
+  }
+}
+
+
+l_type KneserNeyRestaurant::getC(void* payloadPtr) const {
+  return ((Payload*)payloadPtr)->sumCustomers;
+}
+
+
+l_type KneserNeyRestaurant::getT(void* payloadPtr, e_type type) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  if (it != payload.tableMap.end()) {
+    return 1; // if we have a customer of this type, we have exactly one table
+  } else {
+    return 0;
+  }
+}
+
+
+l_type KneserNeyRestaurant::getT(void* payloadPtr) const {
+  return ((Payload*)payloadPtr)->tableMap.size();
+}
+
+
+double KneserNeyRestaurant::computeProbability(void*  payloadPtr,
+                                               e_type type, 
+                                               double parentProbability,
+                                               double discount, 
+                                               double concentration) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  
+  if (payload.sumCustomers == 0) {
+    return parentProbability;
+  }
+
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  int cw = 0;
+  int tw = 0;
+  if (it != payload.tableMap.end()) {
+    cw = (*it).second;
+    tw = 1;
+  }
+
+  return computeHPYPPredictive(cw, // cw
+                               tw, // tw
+                               payload.sumCustomers, // c
+                               payload.tableMap.size(), // t
+                               parentProbability,
+                               discount,
+                               concentration);
+}
+
+
+IHPYPBaseRestaurant::TypeVector KneserNeyRestaurant::getTypeVector(
+    void* payloadPtr) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  IHPYPBaseRestaurant::TypeVector typeVector;
+  typeVector.reserve(payload.tableMap.size());
+  for (Payload::TableMap::iterator it = payload.tableMap.begin();
+       it != payload.tableMap.end(); ++it) {
+    typeVector.push_back((*it).first); 
+  }
+  return typeVector;
+}
+
+
+const IPayloadFactory& KneserNeyRestaurant::getFactory() const {
+  return this->payloadFactory;
+}
+
+
+void KneserNeyRestaurant::updateAfterSplit(void* longerPayloadPtr, 
+                                           void* shorterPayloadPtr, 
+                                           double discountBeforeSplit, 
+                                           double discountAfterSplit,
+                                           bool parentOnly) const {
+  tracer << "KneserNeyRestaurant::updateAfterSplit("
+         << this->toString(longerPayloadPtr)
+         << ", " << this->toString(shorterPayloadPtr)
+         << ", " << discountBeforeSplit
+         << ", " << discountAfterSplit
+         << ")"  << std::endl;
+  
+  Payload& payload = *((Payload*)longerPayloadPtr);
+  Payload& newParent = *((Payload*)shorterPayloadPtr);
+    
+  // make sure the parent is empty
+  assert(newParent.sumCustomers == 0);
+  assert(newParent.tableMap.size() == 0);
+
+  for(Payload::TableMap::iterator it = payload.tableMap.begin();
+      it != payload.tableMap.end(); ++it) {
+    e_type type = (*it).first;
+    newParent.tableMap[type] = 1;
+  }
+  newParent.sumCustomers = payload.tableMap.size();
+}
+  
+
+bool KneserNeyRestaurant::addCustomer(void*  payloadPtr, 
+                                        e_type type, 
+                                        double parentProbability, 
+                                        double discount, 
+                                        double concentration, 
+                                        void*  additionalData) const {
+  tracer << "KneserNeyRestaurant::addCustomer(" << type << "," 
+         << parentProbability << "," << discount << "," << concentration 
+         << ", " << additionalData
+         << ")" << std::endl;
+
+  Payload& payload = *((Payload*)payloadPtr);
+  int& cw = payload.tableMap[type];
+  cw += 1;
+  payload.sumCustomers += 1;
+  return (cw == 1); // true if we created a new table
+}
+
+
+bool KneserNeyRestaurant::removeCustomer(
+    void* payloadPtr, e_type type, double discount,
+    void* additionalData) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  int& cw = (*it).second;
+
+  cw -= 1;
+  payload.sumCustomers -= 1;
+  if (cw == 0) {
+    payload.tableMap.erase(it);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
+std::string KneserNeyRestaurant::toString(void* payloadPtr) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  std::ostringstream out;
+
+  out << "[";
+  for(Payload::TableMap::iterator it = payload.tableMap.begin();
+      it != payload.tableMap.end(); ++it) {
+    out << (*it).first << ":" << (*it).second << ", ";
+  }
+  out << "]";
+  return out.str();
+}
+
+
+bool KneserNeyRestaurant::checkConsistency(void* payloadPtr) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  bool consistent = true; 
+
+  int sumCustomers = 0;
+
+  for (Payload::TableMap::iterator it = payload.tableMap.begin();
+       it != payload.tableMap.end(); ++it) {
+    sumCustomers += (*it).second;
+  }
+
+  consistent = sumCustomers == payload.sumCustomers;
+  if (!consistent) {
+    tracer << "Restaurant internally inconsistent!" 
+           << " " << sumCustomers << "!=" << payload.sumCustomers
+           << std::endl;
+  }
+  return consistent;
+}
+
+
+void KneserNeyRestaurant::Payload::serialize(
+    InArchive & ar, const unsigned int version) {
+  ar >> tableMap;
+  ar >> sumCustomers;
+}
+
+
+void KneserNeyRestaurant::Payload::serialize(
+    OutArchive & ar, const unsigned int version) {
+  ar << tableMap;
+  ar << sumCustomers;
+}
+
+
+void KneserNeyRestaurant::PayloadFactory::save(
+    void* payloadPtr, OutArchive& oa) const {
+  oa << *((Payload*)payloadPtr);
+}
+
+
+void* KneserNeyRestaurant::PayloadFactory::load(InArchive& ia) const {
+  Payload* p = new Payload();
+  ia >> *p;
+  return p;
+}
+
+
+void* KneserNeyRestaurant::createAdditionalData(
+    void* payloadPtr, double discount, double concentration) const {
+  return NULL;
+}
+
+
+void KneserNeyRestaurant::freeAdditionalData(
+    void* additionalData) const {
+  // do nothing
+}
+
+
+
 }} // namespace gatsby::libplump

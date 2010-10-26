@@ -21,6 +21,7 @@
 
 #include <sstream>
 #include "libplump/subseq.h"
+#include "libplump/utils.h"
 
 namespace gatsby { namespace libplump {
 

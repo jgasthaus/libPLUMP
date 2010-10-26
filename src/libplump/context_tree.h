@@ -25,7 +25,7 @@
 #include <sstream>
 #include <stack>
 #include "libplump/config.h"
-#include "libplump/node_manager.h"
+#include "libplump/node_manager_interface.h"
 
 namespace gatsby { namespace libplump {
 
