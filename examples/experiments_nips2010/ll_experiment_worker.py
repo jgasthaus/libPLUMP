@@ -3,6 +3,7 @@
 from optparse import OptionParser, OptionGroup
 import sys
 from numpy import mean
+from antaresia.filecollection import FileCollection
 import libplump as lp
 
 DISCOUNTS = [.62, .69, .74, .80, .95]
@@ -38,14 +39,17 @@ def run(options):
   else:
     predictMode = lp.HPYPModel.ABOVE
 
-  if options.inference == 0:
-    loss = lp.prob2loss(model.predictSequence(testOffset, seq.size(), predictMode))
-  elif options.inference == 1:
+  if options.inference == 1:
     for i in xrange(BURN_IN_SAMPLES):
       print >> sys.stderr, "Burn in iteration %i" %  (i,)
       model.runGibbsSampler()
+
+  if options.prediction != 3:
     loss = lp.prob2loss(model.predictSequence(testOffset, seq.size(), predictMode))
-  elif options.inference == 2:
+  else:
+    loss = mean(model.computeLosses(testOffset, seq.size()))
+
+  if options.inference == 2 and options.prediction != 3:
     losses = []
     for i in xrange(BURN_IN_SAMPLES):
       print >> sys.stderr, "Burn in iteration %i" % (i,)
@@ -57,6 +61,10 @@ def run(options):
     loss = mean(losses)
 
   print loss
+  fc = FileCollection(options.collection)
+  doc = vars(options)
+  doc["loss"] = loss
+  fc.insert(doc)
   
   # make sure destructors are called in correct order
   del model
@@ -70,6 +78,10 @@ def main():
   parser.add_option("--test-file", 
                     dest = "test_file",
                     type = "string")
+  parser.add_option("--collection", 
+                    dest = "collection",
+                    type = "string",
+                    default="collections/default")
   parser.add_option("--alpha",
                     dest = "alpha",
                     type = "float")
@@ -84,9 +96,12 @@ def main():
                     type = "int",
                     help = "prediction mode: 0: above, " + \
                                             "1: fragment, " + \
-                                            "2: below")
+                                            "2: below" + \
+                                            "3: particle filter")
   
   (options, args) = parser.parse_args()
+  if options.inference == 2 and options.prediction == 3:
+    exit(1)
   run(options)
 
 if __name__ == "__main__":
