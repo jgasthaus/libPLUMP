@@ -1,5 +1,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS}
+AM_CXXFLAGS = $(BOOST_CPPFLAGS)
 
 lib_LTLIBRARIES = libplump.la
 libplump_la_SOURCES = libplump/context_tree.cc \
