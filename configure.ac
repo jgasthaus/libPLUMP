@@ -11,32 +11,47 @@ AC_CONFIG_FILES([Makefile
                  bindings/python/setup.py])
 
 AC_ARG_WITH([python],
-              [AS_HELP_STRING([--with-python],
-                [use SWIG to generate a Python binding])],
+                [AS_HELP_STRING([--with-python],
+                [build Python bindings (requires Python)])],
                 [],
                 [pythonbinding=no])
 
+AC_ARG_WITH([swig],
+                [AS_HELP_STRING([--with-swig],
+                [use SWIG to generate bindings])],
+                [],
+                [useswig=no])
+
 AC_PATH_PROG([SWIG], [swig])
 AM_CONDITIONAL([HAVE_SWIG], [test "$SWIG"])
-if test "$SWIG" -a "x$pythonbinding" != xno
+
+if test "$SWIG" -a "x$useswig" != xno
 then
     AX_PKG_SWIG(1.3, [], [])
     SWIG_ENABLE_CXX
     SWIG_PYTHON
 fi
 
-AM_CONDITIONAL([PYTHONBINDING], test "$SWIG" -a "x$pythonbinding" != xno)
-
-if test  "x$pythonbinding" != xno -a ! "$SWIG"
+if test "x$pythonbinding" != xno
 then
-    AC_MSG_WARN([Cannot build Python binding -- SWIG not found.])
+    AX_PYTHON_DEVEL
+fi
+
+
+AM_CONDITIONAL([PYTHONBINDING], test "x$pythonbinding" != xno)
+AM_CONDITIONAL([USESWIG], test "$SWIG" -a "x$useswig" != xno)
+
+if test "x$useswig" != xno -a ! "$SWIG"
+then
+    AC_MSG_WARN([Cannot recreate bindings -- SWIG not found.])
 fi
 
 # Checks for programs.
 AC_PROG_CXX
 
 # Checks for libraries.
-AX_BOOST_BASE([1.3.5],[],[])
+AX_BOOST_BASE([1.3.5],[],[AC_MSG_FAILURE([Cannot find BOOST libraries.])])
+AX_BOOST_SYSTEM
 AX_BOOST_PROGRAM_OPTIONS
 AX_BOOST_FILESYSTEM
 AX_BOOST_SERIALIZATION
