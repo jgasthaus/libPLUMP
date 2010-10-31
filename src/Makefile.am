@@ -19,9 +19,11 @@ library_include_HEADERS = libplump/config.h \
                           libplump/hpyp_model.h \
                           libplump/hpyp_parameters.h \
                           libplump/hpyp_restaurants.h \
+                          libplump/hpyp_restaurant_interface.h \
                           libplump/libplump.h \
                           libplump/mini_map.h \
                           libplump/node_manager.h \
+                          libplump/node_manager_interface.h \
                           libplump/pool.h \
                           libplump/pyp_sample.h \
                           libplump/random.h \
@@ -35,5 +37,5 @@ bin_PROGRAMS = score_file
 score_file_SOURCES = utils/score_file.cc
 score_file_LDADD = libplump.la
 score_file_LDFLAGS = $(BOOST_LDFLAGS) \
-                     $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
+                     $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
 					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB)
