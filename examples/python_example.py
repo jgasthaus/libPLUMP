@@ -1,7 +1,12 @@
 import libplump
 
-restaurant = libplump.KneserNeyRestaurant()
+restaurant = libplump.SimpleFullRestaurant()
+#restaurant = libplump.HistogramRestaurant()
+#restaurant = libplump.KneserNeyRestaurant()
 #restaurant = libplump.ReinstantiatingCompactRestaurant()
+#restaurant = libplump.StirlingCompactRestaurant()
+
+
 nodeManager = libplump.SimpleNodeManager(restaurant.getFactory())
 parameters = libplump.SimpleParameters()
 

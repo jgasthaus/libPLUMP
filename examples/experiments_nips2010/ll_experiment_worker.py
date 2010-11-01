@@ -1,9 +1,9 @@
-"""Worker script that produces one cell in the log-loss results table."""
+"""Script that produces one cell in the log-loss results table (Table 1) in
+   the 'Improvements to the Sequence Memoizer' paper.."""
 
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser
 import sys
-from numpy import mean
-from antaresia.filecollection import FileCollection
+import numpy as np
 import libplump as lp
 
 DISCOUNTS = [.62, .69, .74, .80, .95]
@@ -45,26 +45,22 @@ def run(options):
       model.runGibbsSampler()
 
   if options.prediction != 3:
-    loss = lp.prob2loss(model.predictSequence(testOffset, seq.size(), predictMode))
+    loss = float(lp.prob2loss(model.predictSequence(testOffset, seq.size(), predictMode)))
   else:
-    loss = mean(model.computeLosses(testOffset, seq.size()))
+    loss = float(np.mean(model.computeLosses(testOffset, seq.size())))
 
   if options.inference == 2 and options.prediction != 3:
-    losses = []
+    losses = np.zeros((PREDICT_SAMPLES, seq.size() - testOffset))
     for i in xrange(BURN_IN_SAMPLES):
       print >> sys.stderr, "Burn in iteration %i" % (i,)
       model.runGibbsSampler()
     for i in xrange(PREDICT_SAMPLES):
       print >> sys.stderr, "Prediction iteration %i" % (i,)
       model.runGibbsSampler()
-      losses.append(lp.prob2loss(model.predictSequence(testOffset, seq.size(), predictMode)))
-    loss = mean(losses)
+      losses[i,:] = model.predictSequence(testOffset, seq.size(), predictMode)
+    loss = float(np.mean(-np.log2(np.mean(losses,0))))
 
   print loss
-  fc = FileCollection(options.collection)
-  doc = vars(options)
-  doc["loss"] = loss
-  fc.insert(doc)
   
   # make sure destructors are called in correct order
   del model
@@ -74,17 +70,17 @@ def main():
   parser = OptionParser()
   parser.add_option("--train-file", 
                     dest = "train_file",
-                    type = "string")
+                    type = "string",
+                    help = "File used for training")
   parser.add_option("--test-file", 
                     dest = "test_file",
-                    type = "string")
-  parser.add_option("--collection", 
-                    dest = "collection",
-                    type = "string",
-                    default="collections/default")
+                    type = "string", 
+                    help = "File used for testing")
   parser.add_option("--alpha",
                     dest = "alpha",
-                    type = "float")
+                    type = "float",
+                    help = "Concentration parameter",
+                    default = 0.0)
   parser.add_option("--inference",
                     dest = "inference",
                     type = "int",
@@ -100,7 +96,11 @@ def main():
                                             "3: particle filter")
   
   (options, args) = parser.parse_args()
+  if options.train_file == None or options.test_file == None:
+    parser.print_help()
+    exit(1)
   if options.inference == 2 and options.prediction == 3:
+    print "ERROR: Can't combine particle filter prediction with multiple samples!"
     exit(1)
   run(options)
 
