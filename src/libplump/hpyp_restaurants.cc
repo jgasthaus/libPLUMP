@@ -524,12 +524,27 @@ bool HistogramRestaurant::addCustomer(void*  payloadPtr,
                                       double concentration,
                                       void* additionalData) const {
   assert(additionalData == NULL); 
+  tracer << "HistogramRestaurant::addCustomer(" << type << "," 
+         << parentProbability << "," << discount << "," << concentration 
+         << ", " << additionalData
+         << ")" << std::endl;
 
   Payload& payload = *((Payload*)payloadPtr);
   Payload::Arrangement& arrangement = payload.tableMap[type];
 
   payload.sumCustomers += 1; // c
   arrangement.cw += 1; // cw 
+  if (payload.sumCustomers == 1) {
+    // first customer sits at the first table
+    // this special case is needed as otherwise things will break when alpha=0
+    // and the restaurant has 0 customers in the singleton bucket
+    arrangement.histogram[1] += 1;
+    arrangement.tw += 1;
+    payload.sumTables += 1;
+    return true;
+  }
+
+
   int numBuckets = arrangement.histogram.size(); 
   d_vec tableProbs(numBuckets + 1, 0);
   std::vector<int> assignment(numBuckets,0);
@@ -582,6 +597,9 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
   arrangement.cw -= 1; // cw 
   payload.sumCustomers -= 1; // c
 
+  assert(arrangement.cw >= 0);
+  assert(payload.sumCustomers >= 0);
+
   int numBuckets = arrangement.histogram.size(); 
   int singletonBucket = -1; // invalid bucket
   d_vec tableProbs(numBuckets, 0);
@@ -605,6 +623,7 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
   assert(sample <= (int)numBuckets);
 
   if (sample == singletonBucket) {
+    tracer << "HistogramRestaurant: deleting from singleton bucket" << std::endl;
     assert(arrangement.histogram[1] > 0);
     // singleton -> drop table
     arrangement.histogram[1] -= 1;
@@ -614,10 +633,15 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
     }
     arrangement.tw -= 1;
     payload.sumTables -= 1;
+
+    assert(arrangement.tw >= 0);
+    assert(payload.sumTables >= 0);
+    
     return true;
   } else {
-    // existing table
+    // non-singleton bucket
     arrangement.histogram[assignment[sample]] -= 1;
+    assert(arrangement.histogram[assignment[sample]] >= 0);
     if (arrangement.histogram[assignment[sample]] == 0) {
       // delete empty bucket from histogram
       arrangement.histogram.erase(assignment[sample]);
