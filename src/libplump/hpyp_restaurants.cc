@@ -534,7 +534,7 @@ bool HistogramRestaurant::addCustomer(void*  payloadPtr,
 
   payload.sumCustomers += 1; // c
   arrangement.cw += 1; // cw 
-  if (payload.sumCustomers == 1) {
+  if (arrangement.cw == 1) {
     // first customer sits at the first table
     // this special case is needed as otherwise things will break when alpha=0
     // and the restaurant has 0 customers in the singleton bucket
@@ -590,6 +590,7 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
                                          double discount,
                                          void* additionalData) const {
   assert(additionalData == NULL); 
+  //assert(this->checkConsistency(payloadPtr));
 
   Payload& payload = *((Payload*)payloadPtr);
   Payload::Arrangement& arrangement = payload.tableMap[type];
@@ -621,6 +622,7 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
   // choose table for customer to sit at
   int sample = sample_unnormalized_pdf(tableProbs);
   assert(sample <= (int)numBuckets);
+  assert(tableProbs[sample] > 0);
 
   if (sample == singletonBucket) {
     tracer << "HistogramRestaurant: deleting from singleton bucket" << std::endl;

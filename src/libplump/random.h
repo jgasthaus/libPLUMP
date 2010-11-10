@@ -22,6 +22,7 @@
 
 #include <gsl/gsl_rng.h>
 #include <vector>
+#include <cassert>
 #include <algorithm> // for lower_bound
 
 namespace gatsby { namespace libplump {
@@ -115,6 +116,10 @@ inline long int uniform_int(long int max) {
  * Complexity: O(log MAX)
  */
 inline int sample_unnormalized_pdf(std::vector<double> pdf, int end_pos) {
+    assert(pdf.size() > 0);
+    assert(end_pos < pdf.size());
+    assert(end_pos >= 0);
+
     // if end_pos == 0, use entire vector
     if (end_pos == 0) {
         end_pos = pdf.size()-1;
@@ -122,11 +127,16 @@ inline int sample_unnormalized_pdf(std::vector<double> pdf, int end_pos) {
     
     // compute CDF (inplace)
     for (int i = 0; i < end_pos; ++i) {
+        assert(pdf[i] >= 0);
         pdf[i+1] += pdf[i];
     }
 
+    assert(pdf[end_pos] > 0);
+
     // sample pos ~ Unigorm(0,Z)
     double z = gsl_rng_uniform(global_rng)*pdf[end_pos];
+
+    assert((z >= 0) && (z <= pdf[end_pos]));
     
     // Perform binary search for z using std::lower_bound.
     // lower_bound(begin, end, x) returns the first element within [begin,end)
