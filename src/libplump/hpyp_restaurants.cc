@@ -1168,11 +1168,12 @@ bool StirlingCompactRestaurant::removeCustomer(void* payloadPtr,
 
 void* StirlingCompactRestaurant::createAdditionalData(
     void* payloadPtr, double discount, double concentration) const {
-  return NULL;
+    return new stirling_generator_full_log(discount, 1, 1);
 }
 
 
 void StirlingCompactRestaurant::freeAdditionalData(void* additionalData) const {
+  delete (stirling_generator_full_log*)additionalData;
 
 }
 
