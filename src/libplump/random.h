@@ -24,6 +24,9 @@
 #include <vector>
 #include <cassert>
 #include <algorithm> // for lower_bound
+// only for debugging
+#include <iostream>
+#include "libplump/utils.h"
 
 namespace gatsby { namespace libplump {
 
@@ -134,15 +137,18 @@ inline int sample_unnormalized_pdf(std::vector<double> pdf, int end_pos) {
     assert(pdf[end_pos] > 0);
 
     // sample pos ~ Unigorm(0,Z)
-    double z = gsl_rng_uniform(global_rng)*pdf[end_pos];
+    double z = gsl_rng_uniform_pos(global_rng)*pdf[end_pos];
 
     assert((z >= 0) && (z <= pdf[end_pos]));
     
     // Perform binary search for z using std::lower_bound.
     // lower_bound(begin, end, x) returns the first element within [begin,end)
     // that is equal or larger than x.
-    return std::lower_bound(pdf.begin(), pdf.begin() + end_pos + 1, z)
+    int x = std::lower_bound(pdf.begin(), pdf.begin() + end_pos + 1, z)
          - pdf.begin();
+
+    assert(x == 0 || pdf[x-1] != pdf[x]);
+    return x;
 
 }
 
