@@ -22,20 +22,43 @@
 
 #include <vector>
 
+// only for debugging
+#include <iostream>
+#include "libplump/utils.h"
+
 namespace gatsby { namespace libplump {
 
 ////////////////////////////////////////////////////////////////////////////////
 //        PYP SAMPLING FUNCTIONS FOR GENERATING SEATING ARRANGEMENTS          //
 ////////////////////////////////////////////////////////////////////////////////
 
+std::vector<int> sample_crp_z_fb(double d, int c, int t);
+
+std::vector<int> sample_crp_z_bf(double d, int c, int t);
+
+std::vector<int> sample_crp_given_z(double d, std::vector<int>& z);
+
+inline std::vector<int> sample_crp_ct_fb(double d, int c, int t) {
+  std::vector<int> z = sample_crp_z_fb(d, c, t);
+  return sample_crp_given_z(d, z);
+}
+
+inline std::vector<int> sample_crp_ct_bf(double d, int c, int t) {
+  std::vector<int> z = sample_crp_z_bf(d, c, t);
+  return sample_crp_given_z(d, z);
+}
+
 /**
  * Sample a seating arrangement with c customers around t tables.
+ * Uses backward filtering, forward sampling (stable, preferred).
  *
  * Returns the number of customers at each table in the resulting sample.
  * 
  * Runtime: O(c x t)
  */
-std::vector<int> sample_crp_ct(double d, int c, int t);
+inline std::vector<int> sample_crp_ct(double d, int c, int t) {
+  return sample_crp_ct_bf(d, c, t);
+}
 
 /**
  * Sample a seating arrangement of c customers from a CRP with discount d and

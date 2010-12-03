@@ -21,6 +21,7 @@ namespace std {
 #include "libplump/hpyp_parameters.h"
 #include "libplump/random.h"
 #include "libplump/serialization.h"
+#include "libplump/pyp_sample.h"
 %}
 
 namespace gatsby { namespace libplump {
@@ -55,6 +56,7 @@ typedef int int32_t;
 %include "libplump/context_tree.h"
 %include "libplump/hpyp_parameters.h"
 %include "libplump/hpyp_model.h"
+%include "libplump/pyp_sample.h"
  
 %{
 namespace gatsby { namespace libplump {
