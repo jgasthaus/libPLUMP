@@ -185,6 +185,13 @@ bool SimpleFullRestaurant::addCustomer(void*  payloadPtr,
 
   ++payload.sumCustomers; // c
   ++arrangement.first; // cw 
+
+  if (arrangement.first == 1) {
+    // first customer sits at first table
+    tables.push_back(1);
+    ++payload.sumTables;
+    return true;
+  }
  
   // probs for old tables: \propto cwk - d
   d_vec tableProbs(tables.size() + 1, 0);

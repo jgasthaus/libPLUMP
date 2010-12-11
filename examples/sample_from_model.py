@@ -4,6 +4,8 @@ import libplump
 import sys, tty, termios
 import numpy as np
 
+DISCOUNTS = [.62, .69, .74, .80, .95]
+CONCENTRATION = 50
 
 def getch():
     """Get a single character from stdin."""
@@ -27,7 +29,7 @@ def buildModel(fn):
     #restaurant = libplump.StirlingCompactRestaurant()
     
     nodeManager = libplump.SimpleNodeManager(restaurant.getFactory())
-    parameters = libplump.SimpleParameters()
+    parameters = libplump.SimpleParameters(DISCOUNTS, CONCENTRATION)
     
     seq = libplump.VectorInt()
     libplump.pushCharFileToVec(fn, seq)

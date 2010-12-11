@@ -15,15 +15,15 @@ parameters = libplump.SimpleParameters()
 seq = libplump.VectorInt(map(ord,'oacac'))
 numTypes = max(seq)
 
-model = libplump.HPYPModel(seq,nodeManager, restaurant, parameters, numTypes)
+model = libplump.HPYPModel(seq, nodeManager, restaurant, parameters, numTypes)
 print model.computeLosses(0,len(seq))
-for i in range(10):
+for i in range(seq.size()):
   print model.toString()
   model.runGibbsSampler()
 
-# make sure destructors are called in correct order
 for i in range(len(seq)):
    print model.predict(0,i,i)
 
+# make sure destructors are called in correct order
 del model
 del nodeManager

@@ -10,7 +10,8 @@ ext_modules = [
      extra_link_args = ['@BOOST_LDFLAGS@',
                         '@BOOST_FILESYSTEM_LIB@',
                         '@BOOST_IOSTREAMS_LIB@',
-                        '@BOOST_SERIALIZATION_LIB@']
+                        '@BOOST_SERIALIZATION_LIB@'],
+     extra_compile_args = ['@BOOST_CPPFLAGS@']
     )
     ]
 
