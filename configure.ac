@@ -71,5 +71,6 @@ AC_FUNC_MALLOC
 AC_CHECK_LIB([m],[cos])
 AC_CHECK_LIB([gslcblas],[cblas_dgemm])
 AC_CHECK_LIB([gsl],[gsl_blas_dgemm])
+AC_CHECK_HEADER([gsl/gsl_rng.h])
 
 AC_OUTPUT
