@@ -27,6 +27,7 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include <algorithm>
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////   SOME USEFUL MACROS   ///////////////////////////////////////
@@ -71,6 +72,17 @@ typedef std::vector<unsigned int> ui_vec;
  * Alias: std::vector<std::vector<unsigned int> >
  */
 typedef std::vector<ui_vec> ui_vec_vec;
+
+
+
+/**
+ * Compute log2(x) -- the log2 provided by GCC is somewhat weird.
+ */
+inline double log2(double x){
+  static const double LOG2 = std::log(2.);
+  return std::log(x)/LOG2;
+}
+
 
 /**
  * Read items of type E from a file and push them into a sequence of type
@@ -144,13 +156,14 @@ template<typename T>
  * Count the number of times the elements k=0...max-1 occur in vec and 
  * return the result in ret[k].
  */
-inline std::vector<unsigned int> vec2hist(std::vector<unsigned int>& vec, unsigned int max) {
-  std::vector<unsigned int> ret(max,0);
-  for (unsigned int i=0;i<vec.size();++i) {
-    ++ret[vec[i]];
+template<typename T>
+  inline std::vector<T> vec2hist(std::vector<T>& vec, T max) {
+    std::vector<T> ret(max,0);
+    for (unsigned int i = 0; i < vec.size(); ++i) {
+      ++ret[vec[i]];
+    }
+    return ret;
   }
-  return ret;
-}
 
 /**
  * Compute the mean of the elements in a sequence.
@@ -213,14 +226,22 @@ template<typename elem_t>
     }
   }
 
+
+/**
+ * Add two vectors elementwise.
+ */
+template<typename elem_t>
+  inline void add_vec(std::vector<elem_t>& inout, std::vector<elem_t>& add) {
+    std::transform(inout.begin(), inout.end(), add.begin(), inout.begin(),
+                  std::plus<elem_t>());
+  }
+
 /**
  * Elementwise multiplication. Results is returned in the first argument.
  */
 template<typename elem_t>
   inline void mult_vec(std::vector<elem_t>& inout, std::vector<elem_t> in) {
-    if (inout.size() != in.size()) {
-      return;
-    }
+    assert(inout.size() == in.size());
     for (size_t i=0;i<inout.size();i++){
       inout[i] *= in[i];
     }
