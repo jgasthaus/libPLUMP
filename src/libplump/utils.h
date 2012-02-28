@@ -289,6 +289,16 @@ inline double logsumexp(double a, double b) {
 }
 
 
+inline double sigmoid(double x) {
+  return 1.0/(1.0 + exp(-x));
+}
+
+// logit = inverse sigmoid
+inline double logit(double x) {
+  return log(x) - log(1-x);
+}
+
+
 static clock_t global_clock;
 
 /*

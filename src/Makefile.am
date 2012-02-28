@@ -33,9 +33,14 @@ library_include_HEADERS = libplump/config.h \
                           libplump/switching_restaurant.h \
                           libplump/utils.h
 
-bin_PROGRAMS = score_file
+bin_PROGRAMS = score_file gradient_test
 score_file_SOURCES = utils/score_file.cc
 score_file_LDADD = libplump.la
 score_file_LDFLAGS = $(BOOST_LDFLAGS) \
+                     $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
+					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB)
+gradient_test_SOURCES = utils/gradient_test.cc
+gradient_test_LDADD = libplump.la
+gradient_test_LDFLAGS = $(BOOST_LDFLAGS) \
                      $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
 					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB)

@@ -120,6 +120,10 @@ d_vec HPYPModel::insertContextAndObservation(l_type start,
                                                        obs);
   this->updatePath(path, probabilityPath, discountPath,
                    concentrationPath, obs);
+
+  this->parameters.accumulateParameterGradient(this->restaurant, 
+      path, probabilityPath, discountPath, concentrationPath, obs);
+
   return probabilityPath; 
 }
 

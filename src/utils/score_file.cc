@@ -59,7 +59,14 @@ d_vec predict(po::variables_map& vm, HPYPModel& m, int start_pos, seq_type seq) 
 }
 
 IParameters* getParameters(po::variables_map& vm) {
-  return new SimpleParameters(vm["disc"].as<d_vec>(), vm["alpha"].as<double>());
+  switch(vm["parameters"].as<int>()) {
+    case 0:
+      cerr << "getParameters(): Using SimpleParameters" << endl;
+      return new SimpleParameters(vm["disc"].as<d_vec>(), vm["alpha"].as<double>());
+    case 1:
+      cerr << "getParameters(): Using GradientParameters" << endl;
+      return new GradientParameters(vm["disc"].as<d_vec>(), vm["alpha"].as<double>());
+  }
 }
 
 IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
@@ -216,6 +223,8 @@ int main(int argc, char* argv[]) {
     ("mode", po::value<int>()->default_value(1), "1: particle filter, 2: no fragment, 3: fragment")
     ("restaurant", po::value<int>()->default_value(1),
      "0:KN, 1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching")
+    ("parameters", po::value<int>()->default_value(0),
+     "0:Simple, 1: Gradient")
     ("burn-in",po::value<int>()->default_value(0), "Number of Gibbs iterations for burn in")
     ("samples,s",po::value<int>()->default_value(1), "Number of samples used for prediction")
     ("num-types", po::value<int>()->default_value(256), "Number of types") 
