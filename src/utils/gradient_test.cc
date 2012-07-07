@@ -30,6 +30,9 @@
 #include <libplump/libplump.h>
 #include <libplump/switching_restaurant.h>
 
+#define DISCOUNT sigmoid(d0)*sigmoid(d1)
+#define CONCENTRATION sigmoid(d0)*sigmoid(d1)*exp(a)
+
 using namespace std;
 using namespace gatsby::libplump;
 namespace po = boost::program_options;
@@ -51,14 +54,15 @@ double testSingleGradients(po::variables_map& vm) {
   boost::scoped_ptr<IAddRemoveRestaurant> restaurant(new HistogramRestaurant());
   void* payload = restaurant->getFactory().make();
 
-  double d = logit(0.5);
+  double d0 = logit(0.5);
+  double d1 = logit(0.5);
   double a = 0.;
   double eps = 10e-7;
 
   for (int i = 0; i < 100; ++i) {
-    restaurant->addCustomer(payload, 0, 1/2., sigmoid(d), exp(a));
-    restaurant->addCustomer(payload, 1, 1/2., sigmoid(d), exp(a));
-    restaurant->addCustomer(payload, 1, 1/2., sigmoid(d), exp(a));
+    restaurant->addCustomer(payload, 0, 1/2., DISCOUNT, CONCENTRATION);
+    restaurant->addCustomer(payload, 1, 1/2., DISCOUNT, CONCENTRATION);
+    restaurant->addCustomer(payload, 1, 1/2., DISCOUNT, CONCENTRATION);
   }
   cout << "c0: " <<   restaurant->getC(payload, 0)
        << ", t0: " << restaurant->getT(payload, 0)
@@ -68,48 +72,50 @@ double testSingleGradients(po::variables_map& vm) {
 
   for (int i = 0; i < 100; ++i) {
 
-    double p0 =  restaurant->computeProbability(payload, 0, 1/2., sigmoid(d), exp(a));
-    double p1 =  restaurant->computeProbability(payload, 1, 1/2., sigmoid(d), exp(a));
+    double p0 =  restaurant->computeProbability(payload, 0, 1/2., DISCOUNT, CONCENTRATION);
+    double p1 =  restaurant->computeProbability(payload, 1, 1/2., DISCOUNT, CONCENTRATION);
 
-    cout << "disc: " << sigmoid(d) << ", alpha: " << exp(a) << ", prob of 0: " << p0 << ", prob of 1: " << p1 << endl;
+    cout << "disc: " << DISCOUNT<< ", alpha: " << CONCENTRATION<< ", prob of 0: " << p0 << ", prob of 1: " << p1 << endl;
 
-    double gd0 = PYPPredictiveGradientDiscount(restaurant->getC(payload, 0),
+    double gd0 = PYPPredictiveGradientIndividualDiscount(restaurant->getC(payload, 0),
                                           restaurant->getT(payload, 0),
                                           restaurant->getC(payload),
                                           restaurant->getT(payload),
                                           1/2.,
-                                          sigmoid(d),
-                                          exp(a), 
-                                          0.0)*sigmoid(d)*(1-sigmoid(d))/p0;
-    double gd1 = PYPPredictiveGradientDiscount(restaurant->getC(payload, 1),
+                                          DISCOUNT,
+                                          sigmoid(d0),
+                                          CONCENTRATION,
+                                          0.0)*sigmoid(d0)*(1-sigmoid(d0))/p0;
+    double gd1 = PYPPredictiveGradientIndividualDiscount(restaurant->getC(payload, 1),
                                           restaurant->getT(payload, 1),
                                           restaurant->getC(payload),
                                           restaurant->getT(payload),
                                           1/2.,
-                                          sigmoid(d),
-                                          exp(a), 
-                                          0.0)*sigmoid(d)*(1-sigmoid(d))/p1;
+                                          DISCOUNT,
+                                          sigmoid(d0),
+                                          CONCENTRATION,
+                                          0.0)*sigmoid(d0)*(1-sigmoid(d0))/p1;
     double ga0 = PYPPredictiveGradientConcentration(restaurant->getC(payload, 0),
                                           restaurant->getT(payload, 0),
                                           restaurant->getC(payload),
                                           restaurant->getT(payload),
                                           1/2.,
-                                          sigmoid(d),
-                                          exp(a), 
+                                          DISCOUNT,
+                                          CONCENTRATION,
                                           0.0)*exp(a)/p0;
     double ga1 = PYPPredictiveGradientConcentration(restaurant->getC(payload, 1),
                                           restaurant->getT(payload, 1),
                                           restaurant->getC(payload),
                                           restaurant->getT(payload),
                                           1/2.,
-                                          sigmoid(d),
-                                          exp(a), 
+                                          DISCOUNT,
+                                          CONCENTRATION,
                                           0.0)*exp(a)/p1;
-    double p0p =  log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d+eps), exp(a)));
-    double p0m =  log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d-eps), exp(a)));
+    double p0p =  log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d0+eps)*sigmoid(d1),sigmoid(d0+eps)*sigmoid(d1)*exp(a) ));
+    double p0m =  log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d0-eps)*sigmoid(d1),sigmoid(d0-eps)*sigmoid(d1)*exp(a) ));
     double gd0_est = (p0p - p0m)/(2*eps); 
-    p0p = log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d), exp(a+eps)));
-    p0m = log(restaurant->computeProbability(payload, 0, 1/2., sigmoid(d), exp(a-eps)));
+    p0p = log(restaurant->computeProbability(payload, 0, 1/2., DISCOUNT, DISCOUNT*exp(a+eps)));
+    p0m = log(restaurant->computeProbability(payload, 0, 1/2., DISCOUNT, DISCOUNT*exp(a-eps)));
     double ga0_est = (p0p - p0m)/(2*eps); 
     cout << "Discount: grad of 0: " << gd0
          << ", estimate: " << gd0_est
@@ -120,7 +126,7 @@ double testSingleGradients(po::variables_map& vm) {
          << endl;
     //restaurant->addCustomer(payload, 0, 1/2., 0.5, 1);
     //restaurant->addCustomer(payload, 0, 1/2., sigmoid(d), exp(a));
-    //d += 10*gd0;
+    d0 += gd0;
     a += ga0;
   }
 

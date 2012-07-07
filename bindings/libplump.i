@@ -18,10 +18,12 @@ namespace std {
 #include "libplump/context_tree.h"
 #include "libplump/hpyp_restaurant_interface.h"
 #include "libplump/hpyp_restaurants.h"
+#include "libplump/hpyp_parameters_interface.h"
 #include "libplump/hpyp_parameters.h"
 #include "libplump/random.h"
 #include "libplump/serialization.h"
 #include "libplump/pyp_sample.h"
+#include "libplump/stirling.h"
 %}
 
 namespace gatsby { namespace libplump {
@@ -48,15 +50,17 @@ typedef int int32_t;
 %include "libplump/config.h"
 %include "libplump/utils.h"
 %include "libplump/serialization.h"
+%include "libplump/context_tree.h"
 %include "libplump/node_manager_interface.h"
 %include "libplump/node_manager.h"
 %include "libplump/hpyp_restaurant_interface.h"
+%include "libplump/hpyp_parameters_interface.h"
 %include "libplump/hpyp_restaurants.h"
-%include "libplump/random.h"
-%include "libplump/context_tree.h"
 %include "libplump/hpyp_parameters.h"
+%include "libplump/random.h"
 %include "libplump/hpyp_model.h"
 %include "libplump/pyp_sample.h"
+%include "libplump/stirling.h"
  
 %{
 namespace gatsby { namespace libplump {

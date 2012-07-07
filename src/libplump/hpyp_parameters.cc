@@ -1,5 +1,6 @@
-#include "libplump/hpyp_parameters.h"
 #include <cmath> // for pow
+#include <algorithm> // for fill
+#include "libplump/hpyp_parameters.h"
 #include "libplump/context_tree.h" // for WrappedNodeList
 #include "libplump/utils.h" // for tracer
 
@@ -150,23 +151,12 @@ void SimpleParameters::accumulateParameterGradient(
     const d_vec& discount_path, 
     const d_vec& concentration_path, 
     e_type obs) {
-  static int num_gradients = 0;
-  if (num_gradients == mini_batch_size) {
-    this->stepParameterGradient(default_step_size);
-    num_gradients = 0;
-  }
-  
-  num_gradients++;
+  // DO NOTHING FOR NOW
 }
     
 
 void SimpleParameters::stepParameterGradient(double stepSize) {
-  for (size_t i = 0; i < this->discounts.size(); ++i) {
-    discounts[i] += stepSize * discount_gradient[i];
-    discount_gradient[i] = 0.0;
-  }
-  alpha += stepSize * alpha_gradient;
-  alpha_gradient = 0.0;
+  // DO NOTHING FOR NOW
 }
 
 
@@ -313,12 +303,108 @@ void GradientParameters::accumulateParameterGradient(
     const d_vec& discount_path, 
     const d_vec& concentration_path, 
     e_type obs) {
-  // do nothing
+  int parent_length = -1;
+  int max_context_len = sigmoid_discounts.size()-2;
+  double last_discount_gradient = 0;
+  int j = 0;
+  for(WrappedNodeList::const_iterator it = path.begin(); 
+      it != path.end(); ++it) {
+    int cw = restaurant.getC(it->payload, obs);
+    int tw = restaurant.getT(it->payload, obs);
+    int c  = restaurant.getC(it->payload);
+    int t  = restaurant.getT(it->payload);
+    int this_length = it->end - it->start;
+    for(int i = parent_length + 1; i <= std::min(this_length, max_context_len); ++i) {
+      double s = sigmoid(this->sigmoid_discounts[i]);
+      // update explicit discount gradients
+      this->sigmoid_discount_gradient[i] += PYPPredictiveGradientIndividualDiscount(cw, tw, c, t, 
+      prob_path[j], discount_path[j], s, 
+      concentration_path[j]) / prob_path[j+1] * s * (1 - s);
+    }
+    if(this_length > max_context_len) { 
+       // our context is longer than we have explicit discounts
+      int additional_depth =   this_length 
+                               - std::max(parent_length, max_context_len);
+      double s = sigmoid(this->sigmoid_discounts.back());
+      // update explicit discount gradients
+      last_discount_gradient = PYPPredictiveGradientIndividualDiscount(
+                cw, tw, c, t, 
+                prob_path[j], discount_path[j], s, concentration_path[j],
+                last_discount_gradient, additional_depth
+                ) / prob_path[j+1] * s * (1 - s);
+      this->sigmoid_discount_gradient[this->sigmoid_discount_gradient.size() - 1] += last_discount_gradient;
+    }
+    //  
+    parent_length = this_length;
+    ++j;
+  }
+  d_vec approx_grad = this->approximateParameterGradient(
+    restaurant,
+    path, 
+    prob_path, 
+    discount_path, 
+    concentration_path, 
+    obs);
+
+
+  //std::cout << "Grad: " << iterableToString(this->sigmoid_discount_gradient) << std::endl; 
+ // std::cout << "Approx-grad: " << iterableToString(approx_grad) << std::endl;
+  add_vec(this->sigmoid_discount_gradient, approx_grad);
 }
-    
+
+d_vec GradientParameters::approximateParameterGradient(
+    const IAddRemoveRestaurant& restaurant,
+    const WrappedNodeList& path, 
+    const d_vec& prob_path, 
+    const d_vec& discount_path, 
+    const d_vec& concentration_path, 
+    e_type obs) {
+  const double eps = 10e-7;
+  d_vec ret(this->sigmoid_discounts.size(), 0.0);
+
+  for (int i=0; i < this->sigmoid_discounts.size(); ++i) {
+    double orig_discount = sigmoid_discounts[i];
+    this->sigmoid_discounts[i] += eps;
+    d_vec d_path = this->getDiscounts(path);
+    d_vec c_path = this->getConcentrations(path, d_path);
+    int j = 0;
+    double pp = 1./256.;
+    double pm = pp;
+    for(WrappedNodeList::const_iterator it = path.begin(); 
+        it != path.end(); ++it) {
+      //std::cout << pp << std::endl;
+      pp = restaurant.computeProbability(it->payload, 
+                                                 obs,
+                                                 pp,
+                                                 d_path[j],
+                                                 c_path[j]);
+    ++j;
+    }
+    this->sigmoid_discounts[i] = orig_discount - eps;
+    d_path = this->getDiscounts(path);
+    c_path = this->getConcentrations(path, d_path);
+    j = 0;
+    for(WrappedNodeList::const_iterator it = path.begin(); 
+        it != path.end(); ++it) {
+      pm = restaurant.computeProbability(it->payload, 
+                                                 obs,
+                                                 pm,
+                                                 d_path[j],
+                                                 c_path[j]);
+    ++j;
+    }
+    ret[i] = (log(pp) - log(pm))/(2*eps);
+    this->sigmoid_discounts[i] = orig_discount;
+  }
+  return ret;
+}
 
 void GradientParameters::stepParameterGradient(double stepSize) {
-  // do nothing
+  std::cout << "Grad: " << iterableToString(this->sigmoid_discount_gradient) << std::endl; 
+  mult_vec(this->sigmoid_discount_gradient, stepSize);
+  add_vec(this->sigmoid_discounts, this->sigmoid_discount_gradient);
+  fill(this->sigmoid_discount_gradient.begin(), this->sigmoid_discount_gradient.end(), 0.0); 
+  std::cout << "Disc: " << iterableToString(this->sigmoid_discounts) << std::endl; 
 }
 
 

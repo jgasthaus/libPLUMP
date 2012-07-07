@@ -25,6 +25,7 @@
 #include "libplump/stirling.h"
 #include <cmath>
 #include <sstream>
+#include <gsl/gsl_sf_gamma.h>
 
 namespace gatsby { namespace libplump {
 

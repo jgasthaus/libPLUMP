@@ -1407,6 +1407,32 @@ void KneserNeyRestaurant::freeAdditionalData(
   // do nothing
 }
 
+    
+
+
+double ExpectedTablesCompactRestaurant::computeProbability(void*  payloadPtr,
+                                                 e_type type, 
+                                                 double parentProbability,
+                                                 double discount, 
+                                                 double concentration) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  int cw = 0;
+  int tw = 0;
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  if (it != payload.tableMap.end()) {
+    cw = (*it).second.first;
+    tw = (*it).second.second;
+  }
+  //double expectedNumberOfTables = PYPExpectedNumberOfTables(c);
+  return computeHPYPPredictive(cw, // cw
+                               tw * parentProbability,
+                               payload.sumCustomers, // c
+                               payload.sumTables, // t
+                               parentProbability,
+                               discount,
+                               concentration);
+}
+
 
 
 }} // namespace gatsby::libplump

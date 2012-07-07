@@ -28,6 +28,7 @@
 #include <sstream>
 #include <cassert>
 #include <algorithm>
+#include <gsl/gsl_sf_gamma.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////   SOME USEFUL MACROS   ///////////////////////////////////////
@@ -296,6 +297,20 @@ inline double sigmoid(double x) {
 // logit = inverse sigmoid
 inline double logit(double x) {
   return log(x) - log(1-x);
+}
+
+
+inline double logKramp(double base, double inc, double lim) {
+  if (lim <= 0) {
+    return 0;
+  } else {
+    return lim*log(inc) + gsl_sf_lnpoch(base/inc, lim);
+  }
+}
+
+
+inline double kramp(double base, double inc, double lim) {
+  return exp(logKramp(base, inc, lim));
 }
 
 

@@ -385,6 +385,21 @@ class StirlingCompactRestaurant : public BaseCompactRestaurant {
 
 
 
+class ExpectedTablesCompactRestaurant : public StirlingCompactRestaurant {
+  public:
+    ExpectedTablesCompactRestaurant() 
+        : StirlingCompactRestaurant() {}
+   
+    double computeProbability(void*  payloadPtr,
+                              e_type type, 
+                              double parentProbability,
+                              double discount, 
+                              double concentration) const;
+    
+};
+
+
+
 class KneserNeyRestaurant : public IAddRemoveRestaurant {
   public:
 

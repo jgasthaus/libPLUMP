@@ -173,6 +173,15 @@ inline double log_get_stirling_from_table(d_vec_vec& table, int c, int t) {
   return table[t-1][c-t-1];
 }
 
+
+inline double log_stirling_asymptotic(double d, int c, int t) {
+  return   gsl_sf_lngamma(c) 
+         - gsl_sf_lngamma(1 - d) 
+         - gsl_sf_lngamma(t)
+         - (t-1) * log(d)
+         - d * log(c);
+}
+
 // class log_gen_stirling_table {
 //     private:
 //         std::vector<std::vector<double> > table;

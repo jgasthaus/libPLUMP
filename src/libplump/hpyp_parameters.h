@@ -49,18 +49,39 @@ double PYPPredictiveGradientDiscount(int cw, int tw, int c, int t,
 }
 
 
+double PYPPredictiveGradientIndividualDiscount(int cw, int tw, int c, int t, 
+      double parentProbability, double totalDiscount, double individualDiscount, double concentration,
+      double DParentProbabilityWrtIndividualDiscount = 0.0,
+      int individualDiscountMultiplicity = 1) 
+{
+    double DTotalDiscountWrtIndividualDiscount = individualDiscountMultiplicity * totalDiscount / individualDiscount;
+    double DConcentrationWrtIndividualDisount = concentration / individualDiscount;
+    double denom = (concentration + c);
+    double denom2 = denom * denom;
+    double term1 = DConcentrationWrtIndividualDisount      * (c*parentProbability + totalDiscount*(tw - t*parentProbability) - cw);
+    double term2 = DTotalDiscountWrtIndividualDiscount     * (-tw + parentProbability*t);
+    double term3 = DParentProbabilityWrtIndividualDiscount * (totalDiscount*t + concentration);
+    return term1/denom2 + (term2 + term3)/denom; // the last factor is te same as above
+}
+
+
 /**
  * Compute the gradient of the PYP predictive probability
- * with respect to the concentration parameter.
+ * with respect to the (underlying) concentration parameter \alpha_0.
+ * The given concentration parameter is assumed to be the actual concentration
+ * parameter for the predictive distribution, so that
+ *   concentration = \alpha_0 * discount
  */
 double PYPPredictiveGradientConcentration(int cw, int tw, int c, int t, 
-    double parentProbability, double discount, double concentration,
-    double parentConcentrationDiscount) {
-
-    return     ((concentration + discount*t)*parentConcentrationDiscount + parentProbability)
-             / (c + concentration)
-           -   (cw - discount*tw + (discount*t + concentration)*parentProbability)
-             / ((c+concentration)*(c+concentration));
+      double parentProbability, double discount, double concentration,
+      double DParentProbabilityWrtConcentration) 
+{
+    double DConcentrationWrtAlpha0 = discount;
+    double denom = (concentration + c);
+    double denom2 = denom * denom;
+    double term1 = (-cw + tw*discount + (c - t*discount)*parentProbability)*DConcentrationWrtAlpha0 / denom2;
+    double term2 = (concentration + t*discount)*DParentProbabilityWrtConcentration / denom;
+    return term1 + term2;
 }
 
 
@@ -73,11 +94,9 @@ class SimpleParameters : public IParameters {
     
     SimpleParameters();
 
-    SimpleParameters(d_vec s) : discounts(s), discount_gradient(s.size(), 0.0),
-                                alpha(0), alpha_gradient(0.0) {}
+    SimpleParameters(d_vec s) : discounts(s), alpha(0) {}
 
-    SimpleParameters(d_vec s, double alpha) : discounts(s), discount_gradient(s.size(), 0.0),
-                                alpha(alpha), alpha_gradient(0.0) {}
+    SimpleParameters(d_vec s, double alpha) : discounts(s), alpha(alpha)  {}
 
     /**
      * Get discount parameters for each node in the node list.
@@ -113,11 +132,7 @@ class SimpleParameters : public IParameters {
   
   private:
     d_vec discounts;
-    d_vec discount_gradient;
     double alpha;
-    double alpha_gradient;
-    static const int mini_batch_size = 100;
-    static const double default_step_size = 1e-5;
 
     DISALLOW_COPY_AND_ASSIGN(SimpleParameters);
 };
@@ -132,15 +147,25 @@ class SimpleParameters : public IParameters {
 class GradientParameters : public IParameters {
   public:
     
-    GradientParameters() : sigmoid_discounts(), log_alpha(-std::numeric_limits<double>::infinity()) {
+    GradientParameters() : sigmoid_discounts(), 
+        log_alpha(-std::numeric_limits<double>::infinity()),
+        sigmoid_discount_gradient(), log_alpha_gradient(0) {
       sigmoid_discounts.push_back(logit(0.5));
+      sigmoid_discount_gradient.push_back(0);
     }
 
-    GradientParameters(d_vec s) : sigmoid_discounts(s.size()), log_alpha(-std::numeric_limits<double>::infinity()) {
+    GradientParameters(d_vec s) : sigmoid_discounts(s.size()),
+                                  log_alpha(-std::numeric_limits<double>::infinity()),
+                                  sigmoid_discount_gradient(s.size(),0.0),
+                                  log_alpha_gradient(0.0) {
       this->setDiscounts(s);
     }
 
-    GradientParameters(d_vec s, double alpha) : sigmoid_discounts(s.size()), log_alpha(log(alpha)) {
+    GradientParameters(d_vec s, double alpha) : 
+        sigmoid_discounts(s.size()), 
+        log_alpha(log(alpha)),
+        sigmoid_discount_gradient(s.size(),0.0),
+        log_alpha_gradient(0.0) {
       this->setDiscounts(s);
     }
 
@@ -175,6 +200,14 @@ class GradientParameters : public IParameters {
       e_type obs);
     
     void stepParameterGradient(double stepSize);
+
+    d_vec approximateParameterGradient(
+        const IAddRemoveRestaurant& restaurant,
+        const WrappedNodeList& path, 
+        const d_vec& prob_path, 
+        const d_vec& discount_path, 
+        const d_vec& concentration_path, 
+        e_type obs);
   
   private:
 

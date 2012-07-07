@@ -126,6 +126,7 @@ double score_file(po::variables_map& vm) {
   pushFileToSeq(vm, filename, seq);
   cout << "Sequence length: " << seq.size() << endl;
   cout << "Number of types:  " << num_types << endl;
+  cout << seq[0] << endl;
 
   boost::scoped_ptr<IParameters> parameters(getParameters(vm));
   boost::scoped_ptr<IAddRemoveRestaurant> restaurant(getRestaurant(vm));
@@ -197,15 +198,22 @@ double score_file(po::variables_map& vm) {
     Serializer nodeSerializer(vm["save-serialized-nodes"].as<string>());
     nodeSerializer.saveNodesAndPayloads(*nodeManager, restaurant->getFactory());
   }
+  cout << "Discounts: ";
+  for (int i=0; i < vm["disc"].as<d_vec>().size(); ++i) {
+    cout << parameters->getDiscount(i) << ", ";
+  }
+  cout << endl;
+
 
   return mean(losses);
 }
 
 
 int main(int argc, char* argv[]) {
-  const double sm_disc[] = {.62, .69, .74, .80, .95};
+  const double sm_disc[] = {0.05, 0.7, 0.8, 0.82, 0.84, 0.88, 0.91, 0.92, 0.93, 0.94, 0.95};
+  //const double sm_disc[] = {.62, .69, .74, .80, .95};
   d_vec default_discounts;
-  default_discounts.assign(sm_disc,&sm_disc[5]);
+  default_discounts.assign(sm_disc,&sm_disc[11]);
   // Declare the supported options.
   po::options_description generic("Generic options");
   po::options_description dumping("Dumping options");
