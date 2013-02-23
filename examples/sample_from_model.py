@@ -4,8 +4,8 @@ import libplump
 import sys, tty, termios
 import numpy as np
 
-DISCOUNTS = [.62, .69, .74, .80, .95]
-CONCENTRATION = 50
+DISCOUNTS = [.62, .69, .74, .80, .95, .97, .975, .98]
+CONCENTRATION = 500
 
 def getch():
     """Get a single character from stdin."""
