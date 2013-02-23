@@ -2,6 +2,8 @@ AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS}
 AM_CXXFLAGS = $(BOOST_CPPFLAGS)
 
+LIBS =  $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
+					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB) -lgsl -lgslcblas -lm
 lib_LTLIBRARIES = libplump.la
 libplump_la_SOURCES = libplump/context_tree.cc \
 					  libplump/hpyp_model.cc \
@@ -12,6 +14,7 @@ libplump_la_SOURCES = libplump/context_tree.cc \
 					  libplump/serialization.cc \
 					  libplump/stirling.cc \
 					  libplump/switching_restaurant.cc
+
 
 library_includedir=$(includedir)/libplump
 library_include_HEADERS = libplump/config.h \
@@ -35,12 +38,6 @@ library_include_HEADERS = libplump/config.h \
 
 bin_PROGRAMS = score_file gradient_test
 score_file_SOURCES = utils/score_file.cc
-score_file_LDADD = libplump.la
-score_file_LDFLAGS = $(BOOST_LDFLAGS) \
-                     $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
-					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB)
+score_file_LDADD = libplump.la 
 gradient_test_SOURCES = utils/gradient_test.cc
 gradient_test_LDADD = libplump.la
-gradient_test_LDFLAGS = $(BOOST_LDFLAGS) \
-                     $(BOOST_SYSTEM_LIB) $(BOOST_PROGRAM_OPTIONS_LIB) $(BOOST_FILESYSTEM_LIB) \
-					 $(BOOST_SERIALIZATION_LIB) $(BOOST_IOSTREAMS_LIB)
