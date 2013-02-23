@@ -91,6 +91,9 @@ IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
            << "Using SwitchingRestaurant(SimpleFullRestaurant, 10)"
            << endl;
       return new SwitchingRestaurant(new SimpleFullRestaurant(), 10);
+    case 6:
+      cerr << "getRestaurant(): Using PowerLawRestaurant" << endl;
+      return new PowerLawRestaurant();
   }
   cout << "Unknown restaurant type (--restaurant)!";
   exit(1);

@@ -1434,5 +1434,83 @@ double ExpectedTablesCompactRestaurant::computeProbability(void*  payloadPtr,
 }
 
 
+double PowerLawRestaurant::computeProbability(void*  payloadPtr,
+                                               e_type type, 
+                                               double parentProbability,
+                                               double discount, 
+                                               double concentration) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  
+  if (payload.sumCustomers == 0) {
+    return parentProbability;
+  }
+
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  int cw = 0;
+  double tw = 0;
+  double t = 0;
+  const double POWER = 0.5;
+  if (it != payload.tableMap.end()) {
+    cw = (*it).second;
+    tw = pow(cw, POWER); //TODO: should parameterize this
+  }
+  for (Payload::TableMap::iterator it = payload.tableMap.begin(); it != payload.tableMap.end(); ++it) {
+    t += pow((*it).second, POWER);
+  }
+
+  return computeHPYPPredictiveDouble(cw, // cw
+                                     tw, // tw
+                                     payload.sumCustomers, // c
+                                     t,
+                                     parentProbability,
+                                     discount,
+                                     concentration);
+}
+
+bool FractionalRestaurant::addCustomer(void*  payloadPtr, 
+                                       e_type type, 
+                                       double parentProbability, 
+                                       double discount, 
+                                       double concentration, 
+                                       void*  additionalData) const {
+  tracer << "FractionalRestaurant::addCustomer(" << type << "," 
+         << parentProbability << "," << discount << "," << concentration 
+         << ", " << additionalData
+         << ")" << std::endl;
+
+  Payload& payload = *((Payload*)payloadPtr);
+  int& cw = payload.tableMap[type];
+  cw += 1;
+  payload.sumCustomers += 1;
+  return (cw == 1); // true if we created a new table
+}
+
+double FractionalRestaurant::computeProbability(void*  payloadPtr,
+                                                e_type type, 
+                                                double parentProbability,
+                                                double discount, 
+                                                double concentration) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  
+  if (payload.sumCustomers == 0) {
+    return parentProbability;
+  }
+
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  l_type cw = 0;
+  l_type tw = 0;
+  if (it != payload.tableMap.end()) {
+    cw = (*it).second;
+    tw = 1;
+  }
+
+  return computeHPYPPredictive(cw, // cw
+                               tw, // tw
+                               payload.sumCustomers, // c
+                               payload.tableMap.size(), // t
+                               parentProbability,
+                               discount,
+                               concentration);
+}
 
 }} // namespace gatsby::libplump

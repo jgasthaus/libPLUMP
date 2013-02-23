@@ -451,7 +451,7 @@ class KneserNeyRestaurant : public IAddRemoveRestaurant {
     
     bool checkConsistency(void* payloadPtr) const;
     
-  private:
+  protected:
     
     class Payload : public PoolObject<Payload> {
       public:
@@ -485,6 +485,42 @@ class KneserNeyRestaurant : public IAddRemoveRestaurant {
 };
 
 
+class PowerLawRestaurant : public KneserNeyRestaurant {
+  public:
+    PowerLawRestaurant() : KneserNeyRestaurant() {}
+
+    ~PowerLawRestaurant() {}
+    
+    double computeProbability(void*  payloadPtr,
+                              e_type type, 
+                              double parentProbability,
+                              double discount, 
+                              double concentration) const;
+
+};
+
+
+class FractionalRestaurant : public KneserNeyRestaurant {
+  public:
+    FractionalRestaurant() : KneserNeyRestaurant() {}
+
+    ~FractionalRestaurant() {}
+    
+    double computeProbability(void*  payloadPtr,
+                              e_type type, 
+                              double parentProbability,
+                              double discount, 
+                              double concentration) const;
+    
+    
+    bool addCustomer(void*  payloadPtr, 
+                     e_type type, 
+                     double parentProbability, 
+                     double discount, 
+                     double concentration,
+                     void* additionalData = NULL) const;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 ///////////////////   INLINE FUNCTIONS   ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -493,6 +529,18 @@ inline double computeHPYPPredictive(
     int cw, int tw, int c, int t, 
     double parentProbability, double discount, double concentration) {
   if (c==0) {
+    return parentProbability;
+  } else { 
+    return (cw - discount*tw  
+            + (concentration + discount*t)*parentProbability
+           ) / (c + concentration);
+  }
+}
+
+inline double computeHPYPPredictiveDouble(
+    double cw, double tw, double c, double t, 
+    double parentProbability, double discount, double concentration) {
+  if (c==0.0) {
     return parentProbability;
   } else { 
     return (cw - discount*tw  
