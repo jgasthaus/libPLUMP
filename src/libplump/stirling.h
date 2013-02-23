@@ -30,6 +30,7 @@
 #include <string>
 #include <iostream>
 #include <cassert>
+#include <gsl/gsl_sf_gamma.h>
 
 
 namespace gatsby { namespace libplump {
