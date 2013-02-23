@@ -74,12 +74,13 @@ class SimpleFullRestaurant : public IAddRemoveRestaurant {
                           double discountAfterSplit, 
                           bool parentOnly = false) const;
 
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void* additionalData = NULL) const;
+                     void* additionalData = NULL,
+                     double count = 1) const;
 
     bool removeCustomer(void* payloadPtr, 
                         e_type type,
@@ -173,12 +174,13 @@ class HistogramRestaurant : public IAddRemoveRestaurant {
                           double discountAfterSplit, 
                           bool parentOnly = false) const;
 
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void* additionalData = NULL) const;
+                     void* additionalData = NULL,
+                     double count = 1) const;
 
     bool removeCustomer(void* payloadPtr, 
                         e_type type,
@@ -289,12 +291,13 @@ class BaseCompactRestaurant : public IAddRemoveRestaurant {
                           double discountAfterSplit, 
                           bool parentOnly = false) const;
 
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void*  additionalData = NULL) const;
+                     void*  additionalData = NULL,
+                     double count = 1) const;
     
     std::string toString(void* payloadPtr) const;
     
@@ -342,12 +345,13 @@ class ReinstantiatingCompactRestaurant : public BaseCompactRestaurant {
     ReinstantiatingCompactRestaurant() 
         : BaseCompactRestaurant(), fullRestaurant() {}
     
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void*  additionalData) const;
+                     void*  additionalData = NULL,
+                     double count = 1) const;
 
     bool removeCustomer(void* payloadPtr, 
                         e_type type,
@@ -429,12 +433,13 @@ class KneserNeyRestaurant : public IAddRemoveRestaurant {
                           double discountAfterSplit, 
                           bool parentOnly = false) const;
 
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void* additionalData = NULL) const;
+                     void* additionalData = NULL,
+                     double count = 1) const;
 
     bool removeCustomer(void* payloadPtr, 
                         e_type type,
@@ -513,12 +518,13 @@ class FractionalRestaurant : public KneserNeyRestaurant {
                               double concentration) const;
     
     
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void* additionalData = NULL) const;
+                     void* additionalData = NULL,
+                     double count = 1) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

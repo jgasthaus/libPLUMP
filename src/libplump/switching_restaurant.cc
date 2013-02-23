@@ -121,18 +121,20 @@ bool SwitchingRestaurant::checkConsistency(void* payloadPtr) const {
 }
 
 
-bool SwitchingRestaurant::addCustomer(void*  payloadPtr, 
+double SwitchingRestaurant::addCustomer(void*  payloadPtr, 
                  e_type type, 
                  double parentProbability, 
                  double discount, 
                  double concentration,
-                 void*  additionalData) const {
+                 void*  additionalData,
+                 double count) const {
   return this->switchedRestaurant->addCustomer(getCurrent(payloadPtr),
                                               type, 
                                               parentProbability, 
                                               discount, 
                                               concentration,
-                                              additionalData);
+                                              additionalData,
+                                              count);
 }
 
 

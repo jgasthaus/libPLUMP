@@ -171,13 +171,15 @@ void SimpleFullRestaurant::updateAfterSplit(void* longerPayloadPtr,
 }
 
 
-bool SimpleFullRestaurant::addCustomer(void*  payloadPtr, 
+double SimpleFullRestaurant::addCustomer(void*  payloadPtr, 
                                        e_type type, 
                                        double parentProbability, 
                                        double discount, 
                                        double concentration,
-                                       void*  additionalData) const {
+                                       void*  additionalData,
+                                       double count) const {
   assert(additionalData == NULL); 
+  assert(count == 1);
 
   Payload& payload = *((Payload*)payloadPtr);
   Payload::Arrangement& arrangement = payload.tableMap[type];
@@ -190,7 +192,7 @@ bool SimpleFullRestaurant::addCustomer(void*  payloadPtr,
     // first customer sits at first table
     tables.push_back(1);
     ++payload.sumTables;
-    return true;
+    return 1;
   }
  
   // probs for old tables: \propto cwk - d
@@ -211,11 +213,11 @@ bool SimpleFullRestaurant::addCustomer(void*  payloadPtr,
     // sit at new table
     tables.push_back(1);
     ++payload.sumTables;
-    return true;
+    return 1;
   } else {
     // existing table
     ++tables[table];
-    return false;
+    return 0;
   }
 }
 
@@ -524,13 +526,16 @@ void HistogramRestaurant::updateAfterSplit(void* longerPayloadPtr,
 }
 
 
-bool HistogramRestaurant::addCustomer(void*  payloadPtr, 
+double HistogramRestaurant::addCustomer(void*  payloadPtr, 
                                       e_type type, 
                                       double parentProbability, 
                                       double discount, 
                                       double concentration,
-                                      void* additionalData) const {
+                                      void* additionalData,
+                                      double count) const {
   assert(additionalData == NULL); 
+  assert(count == 1);
+
   tracer << "HistogramRestaurant::addCustomer(" << type << "," 
          << parentProbability << "," << discount << "," << concentration 
          << ", " << additionalData
@@ -548,7 +553,7 @@ bool HistogramRestaurant::addCustomer(void*  payloadPtr,
     arrangement.histogram[1] += 1;
     arrangement.tw += 1;
     payload.sumTables += 1;
-    return true;
+    return 1;
   }
 
 
@@ -578,7 +583,7 @@ bool HistogramRestaurant::addCustomer(void*  payloadPtr,
     arrangement.histogram[1] += 1;
     arrangement.tw += 1;
     payload.sumTables += 1;
-    return true;
+    return 1;
   } else {
     // existing table
     arrangement.histogram[assignment[sample]] -= 1;
@@ -587,7 +592,7 @@ bool HistogramRestaurant::addCustomer(void*  payloadPtr,
       arrangement.histogram.erase(assignment[sample]);
     }
     arrangement.histogram[assignment[sample]+1] += 1;
-    return false;
+    return 0;
   }
 }
 
@@ -955,12 +960,15 @@ void BaseCompactRestaurant::updateAfterSplit(void* longerPayloadPtr,
 }
   
 
-bool BaseCompactRestaurant::addCustomer(void*  payloadPtr, 
+double BaseCompactRestaurant::addCustomer(void*  payloadPtr, 
                                         e_type type, 
                                         double parentProbability, 
                                         double discount, 
                                         double concentration, 
-                                        void*  additionalData) const {
+                                        void*  additionalData,
+                                        double count) const {
+  assert(count == 1.0);
+
   tracer << "BaseCompactRestaurant::addCustomer(" << type << "," 
          << parentProbability << "," << discount << "," << concentration 
          << ", " << additionalData
@@ -978,7 +986,7 @@ bool BaseCompactRestaurant::addCustomer(void*  payloadPtr,
     // first customer always creates a table
     arrangement.second += 1; // inc(tw)
     payload.sumTables += 1; // inc(t)
-    return true;
+    return 1;
   } else {
     double incTProb =   (concentration + discount*payload.sumTables)
       * parentProbability;
@@ -986,9 +994,9 @@ bool BaseCompactRestaurant::addCustomer(void*  payloadPtr,
     if (coin(incTProb)) {
       arrangement.second += 1;
       payload.sumTables += 1;
-      return true;
+      return 1;
     } else {
-      return false;
+      return 0;
     }
   }
 }
@@ -1105,9 +1113,9 @@ void ReinstantiatingCompactRestaurant::freeAdditionalData(
 }
 
 
-bool ReinstantiatingCompactRestaurant::addCustomer(
+double ReinstantiatingCompactRestaurant::addCustomer(
     void*  payloadPtr, e_type type, double parentProbability, double discount,
-    double concentration, void*  additionalData) const {
+    double concentration, void*  additionalData, double count) const {
   if (additionalData != NULL) {
     // need to stay in sync with full restaurant
     Payload& payload = *((Payload*)payloadPtr);
@@ -1120,11 +1128,11 @@ bool ReinstantiatingCompactRestaurant::addCustomer(
                                          discount, 
                                          concentration, 
                                          NULL)) {
-    arrangement.second += 1; // inc(tw)
-    payload.sumTables += 1; // inc(t)
-    return true;
+      arrangement.second += 1; // inc(tw)
+      payload.sumTables += 1; // inc(t)
+      return 1;
     } else {
-      return false;
+      return 0;
     }
   } else {
     return BaseCompactRestaurant::addCustomer(payloadPtr, 
@@ -1297,12 +1305,14 @@ void KneserNeyRestaurant::updateAfterSplit(void* longerPayloadPtr,
 }
   
 
-bool KneserNeyRestaurant::addCustomer(void*  payloadPtr, 
+double KneserNeyRestaurant::addCustomer(void*  payloadPtr, 
                                         e_type type, 
                                         double parentProbability, 
                                         double discount, 
                                         double concentration, 
-                                        void*  additionalData) const {
+                                        void*  additionalData,
+                                        double count) const {
+  assert(count == 1.0);
   tracer << "KneserNeyRestaurant::addCustomer(" << type << "," 
          << parentProbability << "," << discount << "," << concentration 
          << ", " << additionalData
@@ -1312,7 +1322,7 @@ bool KneserNeyRestaurant::addCustomer(void*  payloadPtr,
   int& cw = payload.tableMap[type];
   cw += 1;
   payload.sumCustomers += 1;
-  return (cw == 1); // true if we created a new table
+  return (cw == 1)?1.0:0; // true if we created a new table
 }
 
 
@@ -1327,9 +1337,9 @@ bool KneserNeyRestaurant::removeCustomer(
   payload.sumCustomers -= 1;
   if (cw == 0) {
     payload.tableMap.erase(it);
-    return true;
+    return 1;
   } else {
-    return false;
+    return 0;
   }
 }
 
@@ -1467,12 +1477,13 @@ double PowerLawRestaurant::computeProbability(void*  payloadPtr,
                                      concentration);
 }
 
-bool FractionalRestaurant::addCustomer(void*  payloadPtr, 
+double FractionalRestaurant::addCustomer(void*  payloadPtr, 
                                        e_type type, 
                                        double parentProbability, 
                                        double discount, 
                                        double concentration, 
-                                       void*  additionalData) const {
+                                       void*  additionalData,
+                                       double count) const {
   tracer << "FractionalRestaurant::addCustomer(" << type << "," 
          << parentProbability << "," << discount << "," << concentration 
          << ", " << additionalData
@@ -1482,7 +1493,7 @@ bool FractionalRestaurant::addCustomer(void*  payloadPtr,
   int& cw = payload.tableMap[type];
   cw += 1;
   payload.sumCustomers += 1;
-  return (cw == 1); // true if we created a new table
+  return (cw == 1) ? 1.0 : 0;; // true if we created a new table
 }
 
 double FractionalRestaurant::computeProbability(void*  payloadPtr,

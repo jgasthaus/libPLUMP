@@ -59,12 +59,13 @@ class IHPYPBaseRestaurant {
 class IAddRestaurant : public IHPYPBaseRestaurant {
   public:
     virtual ~IAddRestaurant() {}
-    virtual bool addCustomer(void*  payloadPtr, 
+    virtual double addCustomer(void*  payloadPtr, 
                              e_type type, 
                              double parentProbability, 
                              double discount, 
                              double concentration,
-                             void*  additionalData = NULL) const = 0;
+                             void*  additionalData = NULL,
+                             double count = 1) const = 0;
 };
 
 

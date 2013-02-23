@@ -60,12 +60,13 @@ class SwitchingRestaurant : public IAddRemoveRestaurant {
     
     bool checkConsistency(void* payloadPtr) const;
 
-    bool addCustomer(void*  payloadPtr, 
+    double addCustomer(void*  payloadPtr, 
                      e_type type, 
                      double parentProbability, 
                      double discount, 
                      double concentration,
-                     void*  additionalData = NULL) const;
+                     void*  additionalData = NULL,
+                     double count = 1) const;
 
 
     bool removeCustomer(void* payloadPtr, 
