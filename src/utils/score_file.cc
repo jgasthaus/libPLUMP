@@ -94,6 +94,9 @@ IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
     case 6:
       cerr << "getRestaurant(): Using PowerLawRestaurant" << endl;
       return new PowerLawRestaurant();
+    case 7:
+      cerr << "getRestaurant(): Using FractionalRestaurant" << endl;
+      return new FractionalRestaurant();
   }
   cout << "Unknown restaurant type (--restaurant)!";
   exit(1);
@@ -233,7 +236,7 @@ int main(int argc, char* argv[]) {
     ("head",po::value<int>()->default_value(0), "If given, cuts input to this number of symbols")
     ("mode", po::value<int>()->default_value(1), "1: particle filter, 2: no fragment, 3: fragment")
     ("restaurant", po::value<int>()->default_value(1),
-     "0:KN, 1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching")
+     "0:KN, 1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching, 6: PowerLaw, 7: Fractional")
     ("parameters", po::value<int>()->default_value(0),
      "0:Simple, 1: Gradient")
     ("burn-in",po::value<int>()->default_value(0), "Number of Gibbs iterations for burn in")

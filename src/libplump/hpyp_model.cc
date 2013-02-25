@@ -612,15 +612,18 @@ void HPYPModel::updatePath(const WrappedNodeList& path,
                            e_type obs) {
 
   unsigned int j=path.size()-1;
+  double newTable = 1;
   for(WrappedNodeList::const_reverse_iterator it = path.rbegin(); 
       it != path.rend();
       ++it) {
-    bool newTable = this->restaurant.addCustomer(it->payload,
-                                                 obs,
-                                                 prob_path[j],
-                                                 discount_path[j],
-                                                 concentration_path[j]);
-    if (!newTable) {
+    newTable = this->restaurant.addCustomer(it->payload,
+                                            obs,
+                                            prob_path[j],
+                                            discount_path[j],
+                                            concentration_path[j],
+                                            NULL,
+                                            newTable);
+    if (newTable==0) {
       break;
     }
     j--;

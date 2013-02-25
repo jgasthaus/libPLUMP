@@ -505,11 +505,11 @@ class PowerLawRestaurant : public KneserNeyRestaurant {
 };
 
 
-class FractionalRestaurant : public KneserNeyRestaurant {
+class FractionalRestaurant : public StirlingCompactRestaurant {
   public:
-    FractionalRestaurant() : KneserNeyRestaurant() {}
+    FractionalRestaurant() : StirlingCompactRestaurant(), payloadFactory() {}
 
-    ~FractionalRestaurant() {}
+    virtual ~FractionalRestaurant() {}
     
     double computeProbability(void*  payloadPtr,
                               e_type type, 
@@ -525,6 +525,47 @@ class FractionalRestaurant : public KneserNeyRestaurant {
                      double concentration,
                      void* additionalData = NULL,
                      double count = 1) const;
+    
+    
+    void updateAfterSplit(void* longerPayloadPtr, 
+                          void* shorterPayloadPtr, 
+                          double discountBeforeSplit, 
+                          double discountAfterSplit, 
+                          bool parentOnly = false) const;
+    
+
+    const IPayloadFactory& getFactory() const { return this->payloadFactory; }
+  protected:  
+    
+    class Payload : public PoolObject<Payload> {
+      public:
+        // per type: cw and tw
+        typedef std::pair<double, double> Arrangement;
+        typedef MiniMap<e_type, Arrangement> TableMap;
+
+        Payload() : tableMap(), sumCustomers(0), sumTables(0) {}
+
+        TableMap tableMap;
+        double sumCustomers;
+        double sumTables;
+    };
+
+    class PayloadFactory : public IPayloadFactory {
+      public: 
+      PayloadFactory() {}
+      void* make() const {
+        return new Payload();
+      };
+      
+      void recycle(void* payloadPtr) const {
+        delete (Payload*)payloadPtr;
+      }
+    
+      void save(void* payloadPtr, OutArchive& oa) const;
+      void* load(InArchive& ia) const;
+    };
+
+    const FractionalRestaurant::PayloadFactory payloadFactory;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -549,9 +590,15 @@ inline double computeHPYPPredictiveDouble(
   if (c==0.0) {
     return parentProbability;
   } else { 
-    return (cw - discount*tw  
+    return (std::max(0.0, cw - discount*tw)  
             + (concentration + discount*t)*parentProbability
            ) / (c + concentration);
+  }
+}
+
+inline double pypExpectedNumberOfTables(double alpha, double d, double n) {
+  if (d != 0) {
+    return std::exp(logKramp(alpha + d, 1, n) - std::log(d) - logKramp(alpha + 1, 1, n - 1)) - alpha/d;
   }
 }
 

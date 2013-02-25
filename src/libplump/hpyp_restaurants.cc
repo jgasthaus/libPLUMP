@@ -1487,13 +1487,29 @@ double FractionalRestaurant::addCustomer(void*  payloadPtr,
   tracer << "FractionalRestaurant::addCustomer(" << type << "," 
          << parentProbability << "," << discount << "," << concentration 
          << ", " << additionalData
+         << ", " << count
          << ")" << std::endl;
 
   Payload& payload = *((Payload*)payloadPtr);
-  int& cw = payload.tableMap[type];
-  cw += 1;
-  payload.sumCustomers += 1;
-  return (cw == 1) ? 1.0 : 0;; // true if we created a new table
+  std::pair<double, double>& p = payload.tableMap[type];
+  tracer << p.first << ", " << p.second << ", " <<  payload.sumCustomers << ", " << payload.sumTables << std::endl;
+  double& cw = p.first;
+  cw += count;
+  payload.sumCustomers += count;
+  double frac_t = 0;
+  if (cw == 1) {
+    frac_t = 1;
+  } else {
+    frac_t =   (concentration + discount*payload.sumTables)
+       * parentProbability;
+    tracer << frac_t;
+    assert(frac_t > 0);
+    frac_t = frac_t/(frac_t + cw - p.second * discount);
+    frac_t *= count;
+  }
+  p.second += frac_t;
+  payload.sumTables += frac_t;
+  return frac_t; // true if we created a new table
 }
 
 double FractionalRestaurant::computeProbability(void*  payloadPtr,
@@ -1508,20 +1524,64 @@ double FractionalRestaurant::computeProbability(void*  payloadPtr,
   }
 
   Payload::TableMap::iterator it = payload.tableMap.find(type);
-  l_type cw = 0;
-  l_type tw = 0;
+  double cw = 0;
+  double tw = 0;
   if (it != payload.tableMap.end()) {
-    cw = (*it).second;
-    tw = 1;
+    cw = (*it).second.first;
+    tw = (*it).second.second;
   }
 
-  return computeHPYPPredictive(cw, // cw
+  return computeHPYPPredictiveDouble(cw, // cw
                                tw, // tw
                                payload.sumCustomers, // c
-                               payload.tableMap.size(), // t
+                               payload.sumTables, // t
                                parentProbability,
                                discount,
                                concentration);
+}
+
+
+void FractionalRestaurant::updateAfterSplit(void* longerPayloadPtr, 
+                                           void* shorterPayloadPtr, 
+                                           double discountBeforeSplit, 
+                                           double discountAfterSplit,
+                                           bool parentOnly) const {
+  tracer << "FractionalRestaurant::updateAfterSplit("
+         << this->toString(longerPayloadPtr)
+         << ", " << this->toString(shorterPayloadPtr)
+         << ", " << discountBeforeSplit
+         << ", " << discountAfterSplit
+         << ")"  << std::endl;
+  
+  Payload& payload = *((Payload*)longerPayloadPtr);
+  Payload& newParent = *((Payload*)shorterPayloadPtr);
+    
+  // make sure the parent is empty
+  assert(newParent.sumCustomers == 0);
+  assert(newParent.tableMap.size() == 0);
+
+  for(Payload::TableMap::iterator it = payload.tableMap.begin();
+      it != payload.tableMap.end(); ++it) {
+    e_type type = (*it).first;
+    std::pair<double, double> x = (*it).second;
+    newParent.tableMap[type] = std::pair<double, double>(x.second, 1); // TODO: Incorrect!!!
+    newParent.sumCustomers += x.second;
+    newParent.sumTables += 1;
+  }
+}
+
+
+void FractionalRestaurant::PayloadFactory::save(
+    void* payloadPtr, OutArchive& oa) const {
+  //oa << *((Payload*)payloadPtr);
+}
+
+
+void* FractionalRestaurant::PayloadFactory::load(InArchive& ia) const {
+  //Payload* p = new Payload();
+  //ia >> *p;
+  //return p;
+  return NULL;
 }
 
 }} // namespace gatsby::libplump
