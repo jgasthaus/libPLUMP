@@ -1,6 +1,7 @@
 import libplump
 
-restaurant = libplump.SimpleFullRestaurant()
+#restaurant = libplump.SimpleFullRestaurant()
+restaurant = libplump.FractionalRestaurant()
 #restaurant = libplump.HistogramRestaurant()
 #restaurant = libplump.KneserNeyRestaurant()
 #restaurant = libplump.ReinstantiatingCompactRestaurant()
@@ -11,9 +12,10 @@ nodeManager = libplump.SimpleNodeManager(restaurant.getFactory())
 parameters = libplump.SimpleParameters()
 
 #seq = libplump.vectori(range(10))
-#seq = libplump.vectori([0]*10)
-seq = libplump.VectorInt(map(ord,'oacac'))
-numTypes = max(seq)
+seq = libplump.VectorInt([0,1,2,1,2])
+#seq = libplump.VectorInt(map(ord,'oacac'))
+#numTypes = max(seq)
+numTypes = 3
 
 model = libplump.HPYPModel(seq, nodeManager, restaurant, parameters, numTypes)
 print model.computeLosses(0,len(seq))
@@ -23,7 +25,9 @@ for i in range(seq.size()):
 
 print "Predictions after training:"
 for i in range(len(seq)):
-   print model.predict(0,i,i)
+   #print model.predict(0,i,i)
+   dist = model.predictiveDistribution(0,i)
+   print dist, sum(dist)
 
 # save model to file
 serializer = libplump.Serializer("model.dump")

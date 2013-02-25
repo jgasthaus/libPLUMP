@@ -1426,6 +1426,9 @@ double ExpectedTablesCompactRestaurant::computeProbability(void*  payloadPtr,
                                                  double discount, 
                                                  double concentration) const {
   Payload& payload = *((Payload*)payloadPtr);
+  if (payload.sumCustomers == 0) {
+    return parentProbability;
+  }
   int cw = 0;
   int tw = 0;
   Payload::TableMap::iterator it = payload.tableMap.find(type);
@@ -1433,11 +1436,16 @@ double ExpectedTablesCompactRestaurant::computeProbability(void*  payloadPtr,
     cw = (*it).second.first;
     tw = (*it).second.second;
   }
-  //double expectedNumberOfTables = PYPExpectedNumberOfTables(c);
-  return computeHPYPPredictive(cw, // cw
-                               tw * parentProbability,
+  double expectedNumberOfTables = pypExpectedNumberOfTables(concentration, discount, payload.sumTables);
+  std::cout << "t: " << payload.sumTables 
+            << ", c: " << payload.sumCustomers
+            << ", E[t]: " << expectedNumberOfTables
+            << ", tw: " << tw 
+            << ", E[t]*P0: " << expectedNumberOfTables * parentProbability << std::endl;  
+  return computeHPYPPredictiveDouble(cw, // cw
+                               expectedNumberOfTables * parentProbability,
                                payload.sumCustomers, // c
-                               payload.sumTables, // t
+                               expectedNumberOfTables, // t
                                parentProbability,
                                discount,
                                concentration);
@@ -1494,19 +1502,19 @@ double FractionalRestaurant::addCustomer(void*  payloadPtr,
   std::pair<double, double>& p = payload.tableMap[type];
   tracer << p.first << ", " << p.second << ", " <<  payload.sumCustomers << ", " << payload.sumTables << std::endl;
   double& cw = p.first;
-  cw += count;
-  payload.sumCustomers += count;
   double frac_t = 0;
-  if (cw == 1) {
-    frac_t = 1;
+  if (cw == 0) {
+    frac_t = count; // the first (fractional) customer sits at the first (fractional) table
   } else {
     frac_t =   (concentration + discount*payload.sumTables)
        * parentProbability;
     tracer << frac_t;
-    assert(frac_t > 0);
+    assert(frac_t >= 0);
     frac_t = frac_t/(frac_t + cw - p.second * discount);
     frac_t *= count;
   }
+  cw += count;
+  payload.sumCustomers += count;
   p.second += frac_t;
   payload.sumTables += frac_t;
   return frac_t; // true if we created a new table

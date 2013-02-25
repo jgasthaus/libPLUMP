@@ -97,6 +97,9 @@ IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
     case 7:
       cerr << "getRestaurant(): Using FractionalRestaurant" << endl;
       return new FractionalRestaurant();
+    case 8:
+      cerr << "getRestaurant(): Using ExpectedTablesCompactRestaurant" << endl;
+      return new ExpectedTablesCompactRestaurant();
   }
   cout << "Unknown restaurant type (--restaurant)!";
   exit(1);
