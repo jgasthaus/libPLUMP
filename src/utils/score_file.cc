@@ -43,6 +43,12 @@ static unsigned int num_types = 256;
 d_vec predict(po::variables_map& vm, HPYPModel& m, int start_pos, seq_type seq) {
   d_vec predictive;
   for(int i = start_pos + 1; i < (int)seq.size(); ++i) {    
+    if (vm.count("sum")) {
+        d_vec dist = m.predictiveDistribution(start_pos, i);
+        if (!closeTo(sum(dist), 1)) {
+          std::cout << "probs don't sum to one: " << iterableToString(dist) << std::endl;
+        }
+    }
     switch (vm["fragment"].as<int>()) {
       case 1:
         predictive.push_back(m.predict(start_pos, i, seq[i]));
@@ -230,6 +236,7 @@ int main(int argc, char* argv[]) {
   generic.add_options()
     ("help", "produce help message")
     ("debug,D", "Print debugging output")
+    ("sum,s", "Check that probabilities sum to one")
     ("print-tree", "Print the context tree to the screen")
     ("fragment", po::value<int>()->default_value(1), "1: nofrag; 2: frag; 3:below")
     ("read-int32", "Read input data as 32 bit integers")

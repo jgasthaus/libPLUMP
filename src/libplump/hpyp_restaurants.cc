@@ -1566,15 +1566,17 @@ void FractionalRestaurant::updateAfterSplit(void* longerPayloadPtr,
     
   // make sure the parent is empty
   assert(newParent.sumCustomers == 0);
+  assert(newParent.sumTables == 0);
   assert(newParent.tableMap.size() == 0);
 
   for(Payload::TableMap::iterator it = payload.tableMap.begin();
       it != payload.tableMap.end(); ++it) {
     e_type type = (*it).first;
+    // copy to parent
     std::pair<double, double> x = (*it).second;
-    newParent.tableMap[type] = std::pair<double, double>(x.second, 1); // TODO: Incorrect!!!
+    newParent.tableMap[type] = std::pair<double, double>(x.second, x.second); 
     newParent.sumCustomers += x.second;
-    newParent.sumTables += 1;
+    newParent.sumTables += x.second;
   }
 }
 
