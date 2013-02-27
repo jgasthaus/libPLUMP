@@ -222,10 +222,11 @@ double SimpleFullRestaurant::addCustomer(void*  payloadPtr,
 }
 
 
-bool SimpleFullRestaurant::removeCustomer(void* payloadPtr, 
+double SimpleFullRestaurant::removeCustomer(void* payloadPtr, 
                                           e_type type,
                                           double discount,
-                                          void* additionalData) const {
+                                          void* additionalData, 
+                                          double count) const {
   assert(additionalData == NULL);
 
   Payload& payload = *((Payload*)payloadPtr);
@@ -251,9 +252,9 @@ bool SimpleFullRestaurant::removeCustomer(void* payloadPtr,
   if (tables[table] == 0) { // if table became empty
       tables.erase(tables.begin() + table); // drop from table list
       --payload.sumTables;
-      return true;
+      return 1;
   } else {
-      return false;
+      return 0;
   }
 }
 
@@ -597,10 +598,11 @@ double HistogramRestaurant::addCustomer(void*  payloadPtr,
 }
 
 
-bool HistogramRestaurant::removeCustomer(void* payloadPtr, 
+double HistogramRestaurant::removeCustomer(void* payloadPtr, 
                                          e_type type,
                                          double discount,
-                                         void* additionalData) const {
+                                         void* additionalData,
+                                         double count) const {
   assert(additionalData == NULL); 
   //assert(this->checkConsistency(payloadPtr));
 
@@ -651,7 +653,7 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
     assert(arrangement.tw >= 0);
     assert(payload.sumTables >= 0);
     
-    return true;
+    return 1;
   } else {
     // non-singleton bucket
     arrangement.histogram[assignment[sample]] -= 1;
@@ -661,7 +663,7 @@ bool HistogramRestaurant::removeCustomer(void* payloadPtr,
       arrangement.histogram.erase(assignment[sample]);
     }
     arrangement.histogram[assignment[sample]-1] += 1;
-    return false;
+    return 0;
   }
 }
 
@@ -1074,9 +1076,10 @@ void* BaseCompactRestaurant::PayloadFactory::load(InArchive& ia) const {
 //////////////////////   class ReinstantiatingCompactRestaurant   //////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-bool ReinstantiatingCompactRestaurant::removeCustomer(
+double ReinstantiatingCompactRestaurant::removeCustomer(
     void* payloadPtr, e_type type, double discount,
-    void* additionalData) const {
+    void* additionalData,
+    double count) const {
   Payload& payload = *((Payload*)payloadPtr);
   Payload::Arrangement& arrangement = payload.tableMap[type];
 
@@ -1097,7 +1100,7 @@ bool ReinstantiatingCompactRestaurant::removeCustomer(
     payload.sumTables -= 1;
   }
 
-  return removedTable;
+  return removedTable ? 1 : 0;
 }
 
 
@@ -1150,10 +1153,11 @@ double ReinstantiatingCompactRestaurant::addCustomer(
 //////////////////////   class StirlingCompactRestaurant ///////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-bool StirlingCompactRestaurant::removeCustomer(void* payloadPtr, 
+double StirlingCompactRestaurant::removeCustomer(void* payloadPtr, 
                                                e_type type,
                                                double discount,
-                                               void* additionalData) const {
+                                               void* additionalData, 
+                                               double count) const {
   Payload& payload = *((Payload*)payloadPtr);
   Payload::Arrangement& arrangement = payload.tableMap[type];
  
@@ -1174,9 +1178,9 @@ bool StirlingCompactRestaurant::removeCustomer(void* payloadPtr,
   if (arrangement.first == 0 || coin(decTProb)) {
     arrangement.second -= 1;
     payload.sumTables -= 1;
-    return true;
+    return 1;
   } else {
-    return false;
+    return 0;
   }
 }
 
@@ -1326,9 +1330,10 @@ double KneserNeyRestaurant::addCustomer(void*  payloadPtr,
 }
 
 
-bool KneserNeyRestaurant::removeCustomer(
+double KneserNeyRestaurant::removeCustomer(
     void* payloadPtr, e_type type, double discount,
-    void* additionalData) const {
+    void* additionalData, 
+    double count) const {
   Payload& payload = *((Payload*)payloadPtr);
   Payload::TableMap::iterator it = payload.tableMap.find(type);
   int& cw = (*it).second;
@@ -1509,6 +1514,8 @@ double FractionalRestaurant::addCustomer(void*  payloadPtr,
     frac_t =   (concentration + discount*payload.sumTables)
        * parentProbability;
     tracer << frac_t;
+   // std::cout << payload.sumTables << ", " << p.first << ", "<< p.second << ", " << ", " << parentProbability
+   //           << ", " << frac_t << std::endl;
     assert(frac_t >= 0);
     frac_t = frac_t/(frac_t + cw - p.second * discount);
     frac_t *= count;
@@ -1517,7 +1524,25 @@ double FractionalRestaurant::addCustomer(void*  payloadPtr,
   payload.sumCustomers += count;
   p.second += frac_t;
   payload.sumTables += frac_t;
-  return frac_t; // true if we created a new table
+  return frac_t; 
+}
+
+
+double FractionalRestaurant::removeCustomer(
+    void* payloadPtr, e_type type, double discount,
+    void* additionalData, 
+    double count) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  std::pair<double, double>& p = payload.tableMap[type];
+
+  double frac_t = p.second / p.first * count; // HACK: split equally
+  p.first -= count;
+  p.second -= frac_t;
+  //*it).second = std::make_pair(x.first - count, x.second - frac_t);
+  payload.sumCustomers -= count;
+  payload.sumTables -= frac_t;
+  //std::cout << "del: " << payload.sumTables << ", " << x.first << ", "<< x.second << ", " << ", " << frac_t << std::endl;
+  return frac_t;
 }
 
 double FractionalRestaurant::computeProbability(void*  payloadPtr,

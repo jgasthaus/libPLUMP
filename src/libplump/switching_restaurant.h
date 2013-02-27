@@ -69,10 +69,11 @@ class SwitchingRestaurant : public IAddRemoveRestaurant {
                      double count = 1) const;
 
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData,
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 

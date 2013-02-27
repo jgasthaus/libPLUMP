@@ -111,6 +111,12 @@ class ContextTree {
      * subsequence within the tree.
      */
     WrappedNodeList findLongestSuffix (l_type start, l_type end) const;
+    
+    /**
+     * Find the node in the tree that corresponds to the given subsequence.
+     * This node _has_ to exist in the tree, otherwise the behavior is undefined.
+     */
+    WrappedNodeList findNode(l_type start, l_type end) const;
 
     /**
      * Find the path to the node which is the longest suffix of the given

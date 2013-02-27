@@ -124,8 +124,12 @@ void pushFileToSeq(po::variables_map& vm, std::string filename, seq_type& seq) {
   }
 }
 
-void runSampler(po::variables_map& vm, HPYPModel& model) {
-  model.runGibbsSampler();
+void runSampler(po::variables_map& vm, HPYPModel& model, int train_length) {
+  if (vm["sampler"].as<int>() == 1) {
+    model.runGibbsSampler();
+  } else {
+    model.removeAddSweep(1, train_length);
+  }
 }
 
 
@@ -190,7 +194,7 @@ double score_file(po::variables_map& vm) {
     if (vm.count("burn-in")) {
       for (int i = 0; i < vm["burn-in"].as<int>(); ++i) {
         cout << "Burn-in iteration: " << i << endl;
-        runSampler(vm, model);
+        runSampler(vm, model, start_pos);
         if (vm.count("debug")) {
           if (model.checkConsistency()) {
             cout << "Model consistent." << endl;
@@ -245,6 +249,7 @@ int main(int argc, char* argv[]) {
     ("load-serialized-nodes", po::value<string>(), "File to contain serialized nodes")
     ("head",po::value<int>()->default_value(0), "If given, cuts input to this number of symbols")
     ("mode", po::value<int>()->default_value(1), "1: particle filter, 2: no fragment, 3: fragment")
+    ("sampler", po::value<int>()->default_value(1), "1: gibbs, 2: remove-add")
     ("restaurant", po::value<int>()->default_value(1),
      "0:KN, 1: SimpleFull, 2: Histogram, 3: ReinstantiatingCompact, 4: StirlingCompact, 5: Switching, 6: PowerLaw, 7: Fractional")
     ("parameters", po::value<int>()->default_value(0),

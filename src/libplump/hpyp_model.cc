@@ -128,18 +128,24 @@ d_vec HPYPModel::insertContextAndObservation(l_type start,
   if (j == 1) {
     this->parameters.stepParameterGradient(10e-5);
     j = 0;
-  }
-  j++;
+}
+  
 
   return probabilityPath; 
 }
 
 
-d_vec HPYPModel::insertObservation(l_type start, l_type stop, e_type obs) {
+d_vec HPYPModel::insertObservation(l_type start, l_type stop, e_type obs, 
+    WrappedNodeList* cached_path) {
   tracer << "HPYPModel::insertObservation(" << start << ", " << stop 
          << ", " << obs << ")" << std::endl;
-  
-  WrappedNodeList path = this->contextTree.findLongestSuffix(start,stop);
+
+  WrappedNodeList path;
+  if (cached_path != NULL) {
+    path = *cached_path;
+  } else {
+    path = this->contextTree.findLongestSuffix(start,stop);
+  }
   
   tracer << "  HPYPModel::insertObservation: longest suffix path: " 
          << std::endl << this->contextTree.pathToString(path) << std::endl;
@@ -159,11 +165,18 @@ d_vec HPYPModel::insertObservation(l_type start, l_type stop, e_type obs) {
 
 void HPYPModel::removeObservation(
     l_type start, l_type stop, e_type obs, 
-    const HPYPModel::PayloadDataPath& payloadDataPath) {
+    const HPYPModel::PayloadDataPath& payloadDataPath,
+    WrappedNodeList* cached_path) {
   tracer << "HPYPModel::removeObservation(" << start << ", " << stop 
          << ", " << obs << ")" << std::endl;
 
-  WrappedNodeList path = this->contextTree.findLongestSuffix(start, stop);
+  WrappedNodeList path;
+  if (cached_path != NULL) {
+    path = *cached_path;
+  } else {
+    path = this->contextTree.findLongestSuffix(start,stop);
+  }
+  assert(path.back().end == (*cached_path).back().end);
   
   tracer << "  HPYPModel::removeObservation: longest suffix path: " 
          << std::endl << contextTree.pathToString(path) << std::endl;
@@ -174,6 +187,30 @@ void HPYPModel::removeObservation(
                                   discountPath,
                                   obs,
                                   payloadDataPath);
+}
+
+
+void HPYPModel::removeAddSweep(l_type start, l_type stop) {
+  // start timer
+  clock_t start_t,end_t;
+  start_t = clock();
+  for (int i = start; i < stop; ++i) {
+    HPYPModel::PayloadDataPath payloadDataPath;
+    WrappedNodeList path = this->contextTree.findNode(start, i);
+    //WrappedNodeList p2 = this->contextTree.findLongestSuffix(start, i);
+    //std::cout << path.back().end << ", " << p2.back().end
+    //          << ", " << path.size() << ", " << p2.size() <<std::endl;
+    //assert(path.back().end == p2.back().end);
+    this->removeObservation(start, i, this->seq[i], payloadDataPath, &path);
+    this->insertObservation(start, i, this->seq[i], &path);
+
+    if (i%10000==0) {
+      end_t = clock();
+      std::cerr << makeProgressBarString(i/(double)stop) << " " 
+                << ((double)i*CLOCKS_PER_SEC)/(end_t-start_t) << " chars/sec" 
+                <<  "\r";
+    }
+  }
 }
 
 
@@ -638,6 +675,9 @@ void HPYPModel::removeObservationFromPath(
     const HPYPModel::PayloadDataPath& payloadDataPath) {
   int j = path.size()-1;
 
+
+  double frac_t = 1;
+
   for(WrappedNodeList::const_reverse_iterator it = path.rbegin();
     it != path.rend(); it++) {
 
@@ -646,11 +686,11 @@ void HPYPModel::removeObservationFromPath(
       payloadData = payloadDataPath[j].get();
     }
 
-    bool tableDeleted = this->restaurant.removeCustomer(it->payload,
-                                                        obs,
-                                                        discountPath[j],
-                                                        payloadData);
-    if (!tableDeleted)
+    frac_t = this->restaurant.removeCustomer(it->payload,
+                                             obs,
+                                             discountPath[j],
+                                             payloadData, frac_t);
+    if (frac_t == 0.)
       break;
     j--;
   }

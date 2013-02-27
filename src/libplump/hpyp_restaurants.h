@@ -82,10 +82,11 @@ class SimpleFullRestaurant : public IAddRemoveRestaurant {
                      void* additionalData = NULL,
                      double count = 1) const;
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData, 
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 
@@ -182,10 +183,11 @@ class HistogramRestaurant : public IAddRemoveRestaurant {
                      void* additionalData = NULL,
                      double count = 1) const;
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData, 
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 
@@ -353,10 +355,11 @@ class ReinstantiatingCompactRestaurant : public BaseCompactRestaurant {
                      void*  additionalData = NULL,
                      double count = 1) const;
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData, 
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 
@@ -375,10 +378,11 @@ class StirlingCompactRestaurant : public BaseCompactRestaurant {
     StirlingCompactRestaurant() 
         : BaseCompactRestaurant() {}
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData,
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 
@@ -441,10 +445,11 @@ class KneserNeyRestaurant : public IAddRemoveRestaurant {
                      void* additionalData = NULL,
                      double count = 1) const;
 
-    bool removeCustomer(void* payloadPtr, 
+    double removeCustomer(void* payloadPtr, 
                         e_type type,
                         double discount,
-                        void* additionalData) const;
+                        void* additionalData, 
+                        double count = 1) const;
 
     void* createAdditionalData(void* payloadPtr, 
                                double discount, 
@@ -527,6 +532,13 @@ class FractionalRestaurant : public StirlingCompactRestaurant {
                      double count = 1) const;
     
     
+    double removeCustomer(void* payloadPtr, 
+                        e_type type,
+                        double discount,
+                        void* additionalData, 
+                        double count = 1) const;
+    
+    
     void updateAfterSplit(void* longerPayloadPtr, 
                           void* shorterPayloadPtr, 
                           double discountBeforeSplit, 
@@ -541,7 +553,9 @@ class FractionalRestaurant : public StirlingCompactRestaurant {
       public:
         // per type: cw and tw
         typedef std::pair<double, double> Arrangement;
-        typedef MiniMap<e_type, Arrangement> TableMap;
+        //typedef MiniMap<e_type, Arrangement> TableMap;
+        typedef std::map<e_type, Arrangement> TableMap;
+
 
         Payload() : tableMap(), sumCustomers(0), sumTables(0) {}
 

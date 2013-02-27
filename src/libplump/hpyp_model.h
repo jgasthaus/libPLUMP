@@ -75,7 +75,8 @@ class HPYPModel {
     /**
      * Insert an observation into an existing context.
      */
-    d_vec insertObservation(l_type start, l_type stop, e_type obs);
+    d_vec insertObservation(l_type start, l_type stop, e_type obs, 
+                            WrappedNodeList* path = NULL);
 
     /**
      * Remove an observation of type obs from the given context.
@@ -86,7 +87,8 @@ class HPYPModel {
     void removeObservation(l_type start,
                            l_type stop,
                            e_type obs,
-                           const PayloadDataPath&);
+                           const PayloadDataPath&, 
+                           WrappedNodeList* path = NULL);
 
     /**
      * For each i in [start, stop), insert the context 
@@ -94,6 +96,14 @@ class HPYPModel {
      * then insert seq[i] into the model. 
      */
     d_vec computeLosses(l_type start, l_type stop);
+
+    
+    /**
+     * Update model by calling removeCustomer followed by
+     * addCustomer on all observations/
+     */
+    void removeAddSweep(l_type start, l_type stop);
+
 
     /**
      * Build the context tree for all contexts [start,i) for 

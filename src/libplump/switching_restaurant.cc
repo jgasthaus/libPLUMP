@@ -138,14 +138,16 @@ double SwitchingRestaurant::addCustomer(void*  payloadPtr,
 }
 
 
-bool SwitchingRestaurant::removeCustomer(void* payloadPtr, 
+double SwitchingRestaurant::removeCustomer(void* payloadPtr, 
                     e_type type,
                     double discount,
-                    void* additionalData) const {
+                    void* additionalData,
+                    double count) const {
   return this->switchedRestaurant->removeCustomer(getCurrent(payloadPtr),
                                                  type,
                                                  discount,
-                                                 additionalData);
+                                                 additionalData,
+                                                 count);
 }
 
 

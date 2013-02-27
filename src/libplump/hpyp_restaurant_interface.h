@@ -72,10 +72,11 @@ class IAddRestaurant : public IHPYPBaseRestaurant {
 class IAddRemoveRestaurant : public IAddRestaurant {
   public:
     virtual ~IAddRemoveRestaurant() {}
-    virtual bool removeCustomer(void* payloadPtr, 
+    virtual double removeCustomer(void* payloadPtr, 
                                 e_type type,
                                 double discount,
-                                void* additionalData) const = 0;
+                                void* additionalData,
+                                double count = 1) const = 0;
 
     virtual void* createAdditionalData(void* payloadPtr, 
                                        double discount, 

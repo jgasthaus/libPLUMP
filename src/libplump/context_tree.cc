@@ -209,6 +209,44 @@ WrappedNodeList ContextTree::findLongestSuffix (l_type start, l_type end) const 
 
 
 /**
+ * Find an existing node in the tree
+ */
+WrappedNodeList ContextTree::findNode (l_type start, l_type end) const {
+  l_type offset = 0;
+  WrappedNodeList path;
+  NodeId current = root;
+  NodeId parent;
+  e_type parentKey = 0;
+  l_type depth = 0;
+  bool done = false;
+  while (!done) {
+    l_type curStart = nm.getStart(current);
+    l_type curEnd = nm.getEnd(current);
+    l_type curLength = curEnd - curStart;
+    // wrap the current node and put it in the list
+    WrappedNode n(curStart, curEnd, nm.getPayload(current), depth);
+    path.push_back(n);
+    if (curLength == end - start) { // no more input to consume
+      done = true;
+    } else {
+      // determine key for the child pointer
+      e_type key = seq[end - 1 - curLength];
+      current = nm.getChild(current,key);
+      if (current == NULL) {
+        done = true;
+        break;
+      }
+      offset = curLength;
+      parent = current;
+      parentKey = key;
+      depth++;
+    }
+  }
+  return path;
+}
+
+
+/**
  * Find the path to the node which is the longest suffix of the given
  * subsequence within the tree.
  */
