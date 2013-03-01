@@ -1534,8 +1534,19 @@ double FractionalRestaurant::removeCustomer(
     double count) const {
   Payload& payload = *((Payload*)payloadPtr);
   std::pair<double, double>& p = payload.tableMap[type];
-
-  double frac_t = p.second / p.first * count; // HACK: split equally
+  assert(p.first >= p.second);
+  assert(payload.sumCustomers >= p.first);
+  assert(payload.sumTables >= p.second);
+  double frac_t_equal = p.second / p.first * count; // HACK: split equally
+  double frac_t_approx = (p.second - count) * std::pow(discount, count) * std::pow(p.first, discount) / 
+              (p.first - count) / std::pow(p.first - count, discount) * count;
+  //std::cout << "equal: " << frac_t_equal << std::endl;
+  //std::cout << "approx: " << frac_t_approx << std::endl;
+  double frac_t = frac_t_equal;
+  if (p.first - count > 0 && frac_t_approx > 0 && frac_t_approx <= count) {
+      frac_t = frac_t_approx;
+  }
+  assert(frac_t >= 0);
   p.first -= count;
   p.second -= frac_t;
   //*it).second = std::make_pair(x.first - count, x.second - frac_t);

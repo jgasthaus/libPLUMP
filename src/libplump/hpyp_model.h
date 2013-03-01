@@ -96,6 +96,9 @@ class HPYPModel {
      * then insert seq[i] into the model. 
      */
     d_vec computeLosses(l_type start, l_type stop);
+    
+    
+    d_vec computeLossesWithDeletion(l_type start, l_type stop, l_type lag);
 
     
     /**

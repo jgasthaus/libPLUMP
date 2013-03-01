@@ -248,6 +248,45 @@ d_vec HPYPModel::computeLosses(l_type start, l_type stop) {
 }
 
 
+d_vec HPYPModel::computeLossesWithDeletion(l_type start, l_type stop, l_type lag) {
+  d_vec losses;
+
+  // deal with first symbol: add loss and insert customer
+  losses.push_back(log2((double) this->numTypes));
+  insertRoot(this->seq[start]);
+
+  // start timer
+  clock_t start_t,end_t;
+  start_t = clock();
+
+  for (l_type i=start+1; i < stop; i++) {
+    d_vec prob_path = this->insertContextAndObservation(start,i,this->seq[i]);
+    double prob = prob_path[prob_path.size()-2];
+    losses.push_back(-log2(prob));
+    if (i - lag >= start) {
+      HPYPModel::PayloadDataPath payloadDataPath;
+      WrappedNodeList path = this->contextTree.findNode(start, i - lag);
+      this->removeObservation(start, i - lag, this->seq[i - lag], payloadDataPath, &path);
+    }
+
+    if (i%10000==0) {
+      end_t = clock();
+      std::cerr << makeProgressBarString(i/(double)stop) << " " 
+        << ((double)i*CLOCKS_PER_SEC)/(end_t-start_t) << " chars/sec" 
+        <<  "\r";
+    }
+
+  }
+  end_t = clock();
+
+  std::cerr << makeProgressBarString(1) << " " 
+    << ((double)stop*CLOCKS_PER_SEC)/(end_t-start_t) << " chars/sec" 
+    <<  std::endl;
+
+  return losses;
+}
+
+
 d_vec HPYPModel::predictSequence(l_type start, l_type stop, PredictMode mode) {
   d_vec probs;
   for (l_type i = start; i < stop; i++) {

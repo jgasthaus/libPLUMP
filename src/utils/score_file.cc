@@ -159,7 +159,12 @@ double score_file(po::variables_map& vm) {
     Serializer nodeSerializer(vm["load-serialized-nodes"].as<string>());
     nodeSerializer.loadNodesAndPayloads(*nodeManager, restaurant->getFactory());
   } else {
-    losses = model.computeLosses(0,seq.size());
+    int lag = vm["lag"].as<int>();
+    if (lag == 0) {
+      losses = model.computeLosses(0, seq.size());
+    } else {
+      losses = model.computeLossesWithDeletion(0, seq.size(), lag);
+    }
   }
   
   if (vm.count("debug")) {
@@ -256,6 +261,7 @@ int main(int argc, char* argv[]) {
      "0:Simple, 1: Gradient")
     ("burn-in",po::value<int>()->default_value(0), "Number of Gibbs iterations for burn in")
     ("samples,s",po::value<int>()->default_value(1), "Number of samples used for prediction")
+    ("lag,l",po::value<int>()->default_value(0), "Lag for deleted prediction (0=off)")
     ("num-types", po::value<int>()->default_value(256), "Number of types") 
     ("alpha,a", po::value<double>()->default_value(5), "Concentration parameter") 
     ("disc,d", po::value<d_vec>()->default_value(default_discounts,"..."), "Discount parameter(s)") 
