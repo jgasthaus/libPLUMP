@@ -184,6 +184,7 @@ template<typename T>
     return mean;
   }
 
+
 /**
  * Sum the elements in a sequence.
  *
@@ -232,7 +233,7 @@ template<typename elem_t>
  * Add two vectors elementwise.
  */
 template<typename elem_t>
-  inline void add_vec(std::vector<elem_t>& inout, std::vector<elem_t>& add) {
+  inline void add_vec(std::vector<elem_t>& inout, const std::vector<elem_t>& add) {
     std::transform(inout.begin(), inout.end(), add.begin(), inout.begin(),
                   std::plus<elem_t>());
   }
@@ -247,6 +248,20 @@ template<typename elem_t>
       inout[i] *= in[i];
     }
   }
+
+
+/**
+ * Average the values in multiple vectors of the same length.
+ **/
+inline d_vec average(const d_vec_vec& ins) {
+  d_vec out(ins[0].size(), 0);
+  for (int j = 0; j < ins.size(); j++) {
+    add_vec(out, ins[j]);
+  }
+  mult_vec(out, 1./ins.size());
+  return out;
+}
+
 
 template<typename elem_t>
   inline double prob2loss(std::vector<elem_t> in) {

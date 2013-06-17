@@ -215,6 +215,14 @@ double score_file(po::variables_map& vm) {
           cout << model.toString() << endl;
         }
       }
+      d_vec_vec sample_predictions;
+      for (int i = 0; i < vm["samples"].as<int>(); ++i) {
+        cout << "sampling iteration iteration: " << i << endl;
+        runSampler(vm, model, start_pos);
+        sample_predictions.push_back(predict(vm, model, start_pos, seq));
+        cout << "loss (this sample): " << prob2loss<double>(sample_predictions.back()) << endl;
+        cout << "loss (avg): " << prob2loss<double>(average(sample_predictions)) << endl;
+      }
     }
   }
 

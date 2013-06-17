@@ -109,6 +109,13 @@ class HPYPModel {
 
 
     /**
+     * Remove leaf restaurants from path if they don't contain
+     * any customers anymore.
+     */
+    void prunePath(WrappedNodeList& path);
+
+
+    /**
      * Build the context tree for all contexts [start,i) for 
      * i in [start, stop].
      */

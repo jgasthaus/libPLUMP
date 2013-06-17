@@ -10,6 +10,7 @@ namespace std {
 
 %{
 /* Includes the header in the wrapper code */
+#include <cstddef>
 #include "libplump/hpyp_model.h"
 #include "libplump/config.h"
 #include "libplump/utils.h"
@@ -25,6 +26,18 @@ namespace std {
 #include "libplump/pyp_sample.h"
 #include "libplump/stirling.h"
 %}
+
+
+%pragma(java) jniclasscode=%{
+  static {
+    try {
+      System.loadLibrary("plump");
+    } catch (UnsatisfiedLinkError e) {
+      System.err.println("Native code library failed to load. \n" + e);
+      System.exit(1);
+    }
+  }
+  %}
 
 namespace gatsby { namespace libplump {
 
@@ -74,8 +87,10 @@ namespace gatsby { namespace libplump {
 %template(prob2loss) prob2loss<double>;
 }}
 
+#if SWIGPYTHON
 %init %{
   gatsby::libplump::init_rng();
 %}
+#endif
 
 

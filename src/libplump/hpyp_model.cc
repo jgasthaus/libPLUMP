@@ -786,6 +786,11 @@ bool HPYPModel::checkConsistency(const WrappedNode& node,
 }
 
 
+void HPYPModel::prunePath(WrappedNodeList& path) {
+
+}
+
+
 bool HPYPModel::checkConsistency() const {
   CheckConsistencyVisitor v(*this);
   this->contextTree.visitDFSWithChildren(v);
