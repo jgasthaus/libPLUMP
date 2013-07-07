@@ -380,14 +380,14 @@ double HPYPModel::predictWithFragmentation(l_type start,
     // path.first is length of parent after split
     double discountAfter = parameters.getDiscount(path.first, it->end - it->start);
     it++; // last node
+    double discountFragmented = this->parameters.getDiscount(parentLength,
+                                                             path.first);
     this->restaurant.updateAfterSplit(
         it->payload,
         splitNode,
         discountPath.back(),
-        discountAfter,
+        discountFragmented,
         true); // update splitNode only
-    double discountFragmented = this->parameters.getDiscount(parentLength,
-                                                             path.first);
     double concentrationFragmented = this->parameters.getConcentration(
         discountFragmented, parentLength, path.first);
     probability = this->restaurant.computeProbability(
