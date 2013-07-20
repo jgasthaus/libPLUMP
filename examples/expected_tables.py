@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import math
+import time
 from antaresia.nputils import * 
 from antaresia.plot import * 
 
@@ -32,6 +33,79 @@ def log_post_ts(a,d,cws,tws,p0s):
          np.sum([log_stirling_cached(d,cws[i],tws[i]) for i in range(len(cws))]) + 
          np.sum([tws[i]*math.log(p0s[i]) for i in range(len(cws))])
          )
+
+def logcrp(a,d,c,t):
+ return (libplump.logKramp(a + d, d, float(t -1)) -
+         libplump.logKramp(a + 1, 1, float(c-1)) +
+         log_stirling_cached(d, c, t))
+
+
+
+def log_post_hierarchical_ts(a,d,cw1,tw1,tw0,p0):
+  """Posterior distribution over the number of tables in a two-level hierarchy, 
+  where cw1/tw1 are the number of customer at the bottom level, tw0 
+  are the tables at the top level and p0 is the base distribution."""
+  return (  logcrp(a,d,cw1,tw1) 
+          + logcrp(a,d,tw1,tw0)
+          + tw0*math.log(p0))
+
+def post_hierarchical(a,d,N,p0):
+    res = np.ones((N,N))*-np.inf
+    for tw1 in range(N):
+        for tw0 in range(tw1+1):
+          res[tw1,tw0] = log_post_hierarchical_ts(a,d,N,tw1+1,tw0+1,p0)
+    res -= np.max(res)
+    res = np.exp(res)
+    res /= np.sum(res)
+    return res
+  
+def joint_hierarchical(a,d,N,p0):
+    res = np.ones((N,N))*-np.inf
+    for tw1 in range(N):
+        for tw0 in range(tw1+1):
+          res[tw1,tw0] = (logcrp(a,d,N,tw1+1) + logcrp(a,d,tw1+1,tw0+1))
+    res = np.exp(res)
+    return res
+
+def hierarchical_pf(a,d,N,p0,num_particles=1000, resample=False):
+  X = np.zeros((2,num_particles, N))
+  W = np.zeros((num_particles, N))
+  X[:,:,0] = 1 # first customer at first table
+  W[:,0] = 1./num_particles # first customer at first table
+  et = np.zeros(N)
+  et[0] = 1
+  for i in range(1,N):
+    for j in range(num_particles):
+      cw1 = i
+      tw1 = X[0,j,i-1]
+      tw0 = X[1,j,i-1]
+      p00 = (tw1 - tw0*d + (a+tw0*d)*p0)/(tw1 + a) # predictive in top rest
+      p = (cw1 - tw1*d + (a+tw1*d)*p00)/(cw1 + a) # predictive in bottom rest
+      f1 = (a + d * tw1)*p00/((a + d*tw1)*p00 + cw1 - tw1*d) # new table prob bottom
+      f0 = (a + d * tw0)*p0/((a + d*tw0)*p0 + tw1 - tw0*d) # new table prob top
+      bottom_new_table = int(np.random.rand() < f1)
+      top_new_table = 0
+      if bottom_new_table:
+        top_new_table = int(np.random.rand() < f0)
+      X[0,j,i] = tw1 + bottom_new_table
+      X[1,j,i] = tw0 + top_new_table
+      W[j,i] = W[j,i-1] * p 
+    W[:,i] /= np.sum(W[:,i])
+    if resample and 1./np.sum(np.square(W[:,i])) < 0.1*num_particles:
+      #idx = choice(W[:,i], num_particles)
+      idx = stratified_resampling(W[:,i])
+      idx = residual_resampling(W[:,i])
+      X[:,:,:] = X[:,idx,:]
+      W[:,i] = 1./num_particles
+    #et[i] = np.mean(np.dot(W[:,i], X[1,:,i]))
+  #return np.mean(np.dot(W[:,N-1], X[1,:,N-1])), et
+  return X, W
+
+def evaluate_pf_result(X,W,at):
+   idx = np.sum(X[:,:,-1] == np.array(at)[:,None],0)==2
+   return np.sum(W[idx,-1])
+
+
 
 def post_t(a, d, cw, other_T, p0):
   """Compute the posterior probability distribution over the
@@ -75,7 +149,7 @@ def expected_num_tables(a,d,N,p0):
 def choice(p, N):
   u = np.random.rand(N)
   c = np.cumsum(p)
-  return c.searchsorted(u)
+  return c.searchsorted(u * c[-1])
 
 def optimal_proposal(a, d, cwk, twk, tw, p0):
   post = post_t(a,d,cwk,tw - twk, p0)
@@ -175,6 +249,35 @@ def crp_particle_num_tables(a, d, N, p0, num_particles=1000, resample=False):
     et[i] = np.mean(np.dot(W[:,i], X[1,:,i]))
   return np.mean(np.dot(W[:,N-1], X[1,:,N-1])), et
 
+def full_crp_particle_num_tables(a, d, N, p0, num_particles=1000, resample=False):
+  X = np.zeros((N,num_particles, N)) # table_id, particles, input pos
+  W = np.zeros((num_particles, N))
+  X[0,:,0] = 1 # first customer at first table
+  W[:,0] = 1./num_particles # first customer at first table
+  et = np.zeros(N)
+  et[0] = 1
+  for i in range(1,N):
+    X[:,:,i] = X[:,:,i-1]
+    for j in range(num_particles):
+      tables = X[:,j,i]
+      num_tables = np.sum(tables > 0)
+      probs = np.zeros(num_tables + 1)
+      probs[0:num_tables] = tables[:num_tables] - d
+      probs[-1] = (a + d*num_tables)*p0
+      sample = choice(probs, 1)[0]
+      X[sample,j,i] += 1
+      p = (np.sum(tables) - num_tables*d + (a+num_tables*d)*p0)/(np.sum(tables) + a)
+      W[j,i] = W[j,i-1] * p
+    W[:,i] /= np.sum(W[:,i])
+    if resample and 1./np.sum(np.square(W[:,i])) < 0.1*num_particles:
+      #idx = choice(W[:,i], num_particles)
+      idx = stratified_resampling(W[:,i])
+      idx = residual_resampling(W[:,i])
+      X[:,:,:] = X[:,idx,:]
+      W[:,i] = 1./num_particles
+    et[i] = np.mean(np.dot(W[:,i], np.sum(X[:,:,i]>0,0)))
+  return np.mean(np.dot(W[:,N-1], np.sum(X[:,:,N-1]>0,0))), et
+
 
 def crp_particle_num_tables_uniform_proposal(a, d, N, p0, num_particles=1000, resample=False):
   X = np.zeros((2,num_particles, N))
@@ -205,9 +308,10 @@ def crp_particle_num_tables_uniform_proposal(a, d, N, p0, num_particles=1000, re
     et[i] = np.mean(np.dot(W[:,i], X[1,:,i]))
   return np.mean(np.dot(W[:,N-1], X[1,:,N-1])), et
 
-def crp_particle_num_tables_enumerate(a, d, N, p0, num_particles=1000, sample=True):
+def crp_particle_num_tables_enumerate(a, d, N, p0, num_particles=1000, merge = True, sample=True):
   particles = [1]
   weights = [1.]
+  et = [1]
   for i in range(1,N):
     new_particles = []
     new_weights = []
@@ -222,7 +326,14 @@ def crp_particle_num_tables_enumerate(a, d, N, p0, num_particles=1000, sample=Tr
       #new_weights.extend([w, w*p0])
     weights = np.array(new_weights)
     weights /= np.sum(weights)
-    particles = new_particles
+    if merge:
+      particles=np.array(new_particles)
+      u = np.unique(particles)
+      weights = np.bincount(particles, weights)[u]
+      particles=u
+    else:
+      particles = new_particles
+    #print particles, weights
     if len(particles) > num_particles:
       if sample:
         idx = choice(weights, num_particles)
@@ -232,8 +343,9 @@ def crp_particle_num_tables_enumerate(a, d, N, p0, num_particles=1000, sample=Tr
         weights = weights[idx]
         weights /= np.sum(weights)
       particles = [particles[k] for k in idx]
+    et.append(np.dot(weights, particles))
   particles = np.array(particles)
-  return np.dot(weights, particles)
+  return np.dot(weights, particles), et
 
 
 def crp_fractional_num_tables(a, d, N, p0):
@@ -354,6 +466,37 @@ def plot_posterior_components(a,N, ds=np.arange(0.1,1,0.2), ps=np.arange(0.1,1,0
   return fig, ax
 
 
+def plot_crp_particle_filters(a, d, N, p0):
+   for i in range(20): plt.plot(full_crp_particle_num_tables(a,d,N,p0,100)[1],'b',alpha=0.5)
+   for i in range(20): plt.plot(crp_particle_num_tables(a,d,N,p0,100)[1],'r',alpha=0.5)
+   for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100)[1],'g',alpha=0.5)
+   for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100, sample=False)[1],'c',alpha=0.5)
+
+   plt.plot([expected_num_tables(a, d,i+1, p0)[1] for i in range(N)],'k',linewidth=2)
+   plt.grid()
+   plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('# tables')
+
+def plot_enumerate_particle_filters(a, d, N, p0):
+   #for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100)[1],'g',alpha=0.5)
+   before = time.clock()
+   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,10,sample=False)[1],'b',alpha=0.5)
+   after = time.clock()
+   print "Elapsed time", after - before
+   #for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100, merge=False, sample=False)[1],'r',alpha=0.5)
+
+   before = time.clock()
+   plt.plot([expected_num_tables(a, d,i+1, p0)[1] for i in range(N)],'k',linewidth=2)
+   after = time.clock()
+   print "Elapsed time", after - before
+   plt.grid()
+   plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('# tables')
+
+
+
 def main():
   """Create various plots and save them."""
   fig, ax = plot_posterior_components(1., 100)
@@ -361,4 +504,5 @@ def main():
   save_figure(fig, "plot.pdf")
 
 if __name__ == "__main__":
-  main()
+    pass
+    #main()

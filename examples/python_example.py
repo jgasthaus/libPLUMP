@@ -1,7 +1,7 @@
 import libplump
 
-#restaurant = libplump.SimpleFullRestaurant()
-restaurant = libplump.FractionalRestaurant()
+restaurant = libplump.SimpleFullRestaurant()
+#restaurant = libplump.FractionalRestaurant()
 #restaurant = libplump.HistogramRestaurant()
 #restaurant = libplump.KneserNeyRestaurant()
 #restaurant = libplump.ReinstantiatingCompactRestaurant()

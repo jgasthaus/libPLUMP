@@ -130,10 +130,10 @@ class SimpleParameters : public IParameters {
     
     void stepParameterGradient(double stepSize);
   
-  private:
     d_vec discounts;
     double alpha;
 
+  private:
     DISALLOW_COPY_AND_ASSIGN(SimpleParameters);
 };
 
