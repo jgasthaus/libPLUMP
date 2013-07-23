@@ -19,6 +19,56 @@ def log_stirling_cached(d,n,m):
     log_stirling_cache[(d,n,m)] = r
     return r
 
+# stratified resampling of Carpenter et al.
+def strat_res(w,N):
+    K = np.sum(w/N)
+    U = np.random.rand()*K
+    out = []
+    for i in range(len(w)):
+      U = U - w[i]
+      if U < 0:
+          out.append(i)
+          U = U + K
+    return out
+
+
+# comp optimal threshold for resampling as in Fearnhead
+def opt_thresh(w, N):
+    w_sort = np.sort(w)
+    o = np.ones((2,len(w)))
+    j = -1
+    for i in range(len(w)):
+      o[1,:] = w_sort/w_sort[i]
+      m = np.sum(np.min(o,0))
+      if m <= N:
+        j = i
+        break
+    if j == -1:
+        print "warning, no such j found!"
+    kappa = w_sort[j]
+    print kappa
+    Ak = np.sum(w_sort >= kappa)
+    print Ak
+    Bk = np.sum(w_sort[w_sort < kappa])
+    return Bk/(N - Ak)
+
+# perform Fearnhead's threshold resampling
+def threshold_resampling(w, N):
+    outweights = np.zeros(w.shape)
+    c = opt_thresh(w,N)
+    keep = w > c
+    M = np.sum(keep)
+    print M
+    outweights[keep] = w[keep]
+    otherweights = w[w <= c]
+    otherweights /= np.sum(otherweights)
+    others = strat_res(otherweights,(N-M))
+    idx = np.arange(len(w))[w <= c][others]
+    outweights[idx] = c
+    return outweights
+
+
+
 # compute log posterior probability of tw tables up to 
 # and additive constant
 def log_post_t(a,d,cw,tw,T,p0):
@@ -39,7 +89,11 @@ def logcrp(a,d,c,t):
          libplump.logKramp(a + 1, 1, float(c-1)) +
          log_stirling_cached(d, c, t))
 
-
+def prior_et(a,d,c):
+   return (np.exp( libplump.logKramp(a + d, 1, c)
+                 - np.log(d) 
+                 - libplump.logKramp(a + 1, 1, c - 1))
+         - a/d)
 
 def log_post_hierarchical_ts(a,d,cw1,tw1,tw0,p0):
   """Posterior distribution over the number of tables in a two-level hierarchy, 
@@ -336,13 +390,17 @@ def crp_particle_num_tables_enumerate(a, d, N, p0, num_particles=1000, merge = T
     #print particles, weights
     if len(particles) > num_particles:
       if sample:
-        idx = choice(weights, num_particles)
-        weights = np.ones(num_particles,dtype=np.double)/num_particles
+        newweights = threshold_resampling(weights, num_particles)
+        idx = newweights > 0
+        print np.sum(idx)
+        particles = particles[idx]
+        weights = newweights[idx]
+        print particles.shape, weights.shape
       else:
         idx = np.argsort(weights)[-num_particles:]
         weights = weights[idx]
         weights /= np.sum(weights)
-      particles = [particles[k] for k in idx]
+        particles = [particles[k] for k in idx]
     et.append(np.dot(weights, particles))
   particles = np.array(particles)
   return np.dot(weights, particles), et
@@ -359,36 +417,56 @@ def crp_fractional_num_tables(a, d, N, p0):
 
 
 
-def plot_posterior_tables(a,ds,N,p0):
+def plot_posterior_tables_vary_d(a,ds,N,p0):
   i = 1
   fig = plt.figure()
   for d in ds:
     post, et = expected_num_tables(a,float(d),N,p0)
     ax = fig.add_subplot(len(ds)/3, 3, i)
     ax.bar(range(1,N+1), post, color = "black")
-    ax.axis((1,N,0,0.2))
+    ax.axis((1,N,0,0.5))
     ax.grid();
-    ax.set_title("$d = %.1f, E[t_w] = %.2f$" %(d, et))
+    ax.set_title("$d = %.1f$, $E[t_w] = %.2f$" %(d, et))
     i += 1
-  fig.suptitle("Posterior distribution of $t_w$; \\alpha=%.1f, p_0=%.1f$" % (a, p0))
+  fig.suptitle("Posterior distribution of $t_s$; $c_s = %d$, $\\alpha=%.1f$, $H(s)=%.1f$" % (N,a, p0))
+  fig.set_size_inches(8,9)
   return fig, ax
 
 
-def plot_posterior_tables_ds_ps(a,N,ds=np.arange(0.1,1,0.1),p0s=np.arange(0.2,1.1,0.1)):
+def plot_posterior_tables_vary_p(a,d,N,p0s):
   i = 1
+  fig = plt.figure()
+  for p0 in p0s:
+    post, et = expected_num_tables(a,float(d),N,p0)
+    ax = fig.add_subplot(len(p0s)/3, 3, i)
+    ax.bar(range(1,N+1), post, color = "black")
+    ax.axis((1,N,0,0.8))
+    ax.grid();
+    ax.set_title("$H(s) = %.1f$, $E[t_w] = %.2f$" %(p0, et))
+    i += 1
+  fig.suptitle("Posterior distribution of $t_s$; $c_s = %d$, $\\alpha=%.1f$, $d=%.1f$" % (N,a, d))
+  fig.set_size_inches(8,9)
+  return fig, ax
+
+
+def plot_posterior_tables_ds_ps(a,N,ds=np.arange(0.0,1,0.1),p0s=np.arange(0.2,1.1,0.1)):
+  i = 1
+  cm = plt.cm.spectral
   for p0 in p0s:
     plt.subplot(len(ds)/3, 3, i)
+    plt.gca().set_color_cycle([cm(k) for k in np.linspace(0, 1, 11)])
     for d in ds:
       post, et = expected_num_tables(a,float(d),N,float(p0))
       plt.plot(range(1,N+1), post)
-    plt.gca().set_color_cycle(mpl.rcParams['axes.color_cycle'])
+    plt.gca().set_color_cycle([cm(k) for k in np.linspace(0, 1, 11)])
     for d in ds:
       post, et = expected_num_tables(a,float(d),N,float(p0))
       plt.plot([et],[d],'x')
     plt.axis((1,N,0,1))
     plt.grid();
-    plt.title("p0 = %.2f" %(p0,))
+    plt.title("H(s) = %.2f" %(p0,))
     i += 1
+  plt.gcf().suptitle("Posterior distribution of $t_s$; $c_s = %d$, $\\alpha=%.1f$" % (N,a))
 
 
 
@@ -465,12 +543,23 @@ def plot_posterior_components(a,N, ds=np.arange(0.1,1,0.2), ps=np.arange(0.1,1,0
   ax.grid(True)
   return fig, ax
 
+def get_errorbars(fun, K=10):
+    runs = []
+    for i in range(K):
+      runs.append(fun())
+    data = np.array(runs)
+    m = np.mean(data,0)
+    sd = np.std(data,0)
+    return m, sd
 
-def plot_crp_particle_filters(a, d, N, p0):
-   for i in range(20): plt.plot(full_crp_particle_num_tables(a,d,N,p0,100)[1],'b',alpha=0.5)
-   for i in range(20): plt.plot(crp_particle_num_tables(a,d,N,p0,100)[1],'r',alpha=0.5)
-   for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100)[1],'g',alpha=0.5)
-   for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100, sample=False)[1],'c',alpha=0.5)
+def plot_crp_particle_filters(a, d, N, p0, K=10):
+   m1, s1 = get_errorbars(lambda:  full_crp_particle_num_tables(a,d,N,p0,100)[1],K)
+   plt.errorbar(range(1,N+1), m1, s1,fmt='b',alpha=0.5)
+   m2, s2 = get_errorbars(lambda: crp_particle_num_tables(a,d,N,p0,100)[1], K)
+   plt.errorbar(range(1,N+1), m2, s2,fmt='r',alpha=0.5)
+   m3, s3 = get_errorbars(lambda: crp_particle_num_tables_enumerate(a,d,N,p0,20)[1], K)
+   plt.errorbar(range(1,N+1), m3, s3,fmt='g',alpha=0.5)
+   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0, 20, sample=False)[1],'c',alpha=0.5)
 
    plt.plot([expected_num_tables(a, d,i+1, p0)[1] for i in range(N)],'k',linewidth=2)
    plt.grid()
@@ -478,10 +567,23 @@ def plot_crp_particle_filters(a, d, N, p0):
    plt.xlabel("# customers of type $s$")
    plt.ylabel('# tables')
 
-def plot_enumerate_particle_filters(a, d, N, p0):
+def plot_crp_particle_filter_variance(a, d, N, p0, num_particles_list, K=10):
+   m1, s1 = get_errorbars(lambda:  [crp_particle_num_tables(a,d,N,p0,i)[1][-1] for i in num_particles_list],K)
+   plt.errorbar(num_particles_list, m1, s1,fmt='b',alpha=0.5)
+   m2, s2 = get_errorbars(lambda:  [crp_particle_num_tables_enumerate(a,d,N,p0,i)[1][-1] for i in num_particles_list], K)
+   plt.errorbar(num_particles_list, m2, s2,fmt='r',alpha=0.5)
+   plt.hlines(expected_num_tables(a,d,N,p0)[1],num_particles_list[0], num_particles_list[-1])
+   plt.grid()
+   plt.title(r"SMC Estimate of $E[t_s]$, $c_s = %d$, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(N,a,d,p0))
+   plt.xlabel("# particles")
+   plt.ylabel('$E[t_s]$')
+
+def plot_enumerate_particle_filters(a, d, N, p0, num_particles=100):
    #for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100)[1],'g',alpha=0.5)
    before = time.clock()
-   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,10,sample=False)[1],'b',alpha=0.5)
+   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,num_particles,sample=False)[1],'b',alpha=0.5)
+   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,num_particles,sample=True)[1],'r',alpha=0.5)
+   plt.plot([crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'g--')
    after = time.clock()
    print "Elapsed time", after - before
    #for i in range(20): plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0,100, merge=False, sample=False)[1],'r',alpha=0.5)

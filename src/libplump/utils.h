@@ -316,6 +316,8 @@ inline double logit(double x) {
 
 
 inline double logKramp(double base, double inc, double lim) {
+  if (inc == 0)
+      return lim*log(base);
   if (lim <= 0) {
     return 0;
   } else {
