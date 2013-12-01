@@ -20,12 +20,18 @@ To get started with the code you will need a few additional things:
 
   - Python 2.5 or higher (but not 3.x)
     www.python.org
+    
+  - libtool
+    http://www.gnu.org/software/libtool/
 
 
 0.2 Compiling
 -------------------------------------------------------------------------------
 If you have the dependencies listed above installed in default locations then
 simply doing
+
+  # autoreconf --install
+  # chmod +x configure
 
   # ./configure --with-python
   # make
