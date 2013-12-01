@@ -31,8 +31,6 @@ If you have the dependencies listed above installed in default locations then
 simply doing
 
   # autoreconf --install
-  # chmod +x configure
-
   # ./configure --with-python
   # make
 
