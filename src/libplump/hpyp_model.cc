@@ -124,11 +124,11 @@ d_vec HPYPModel::insertContextAndObservation(l_type start,
   this->updatePath(path, probabilityPath, discountPath,
                    concentrationPath, obs);
 
-  static int j = 0;
-  if (j == 1) {
-    this->parameters.stepParameterGradient(10e-5);
-    j = 0;
-}
+  // static int j = 0;
+  //if (j == 1) {
+    this->parameters.stepParameterGradient(10e-4);
+  //  j = 0;
+  //}
   
 
   return probabilityPath; 

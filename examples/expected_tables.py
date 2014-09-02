@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import math
 import time
+from collections import defaultdict
 from antaresia.nputils import * 
 from antaresia.plot import * 
 
@@ -112,6 +113,42 @@ def post_hierarchical(a,d,N,p0):
     res = np.exp(res)
     res /= np.sum(res)
     return res
+
+
+def post_hierarchical_three(a,d,N,p0):
+    res = np.ones((N,N,N))*-np.inf
+    for tw2 in range(N):
+        for tw1 in range(tw2+1):
+            for tw0 in range(tw1+1):
+                res[tw2,tw1,tw0] = (  logcrp(a,d,N,tw2 + 1)
+                                    + logcrp(a,d,tw2 + 1,tw1 + 1)
+                                    + logcrp(a,d,tw1 + 1, tw0 + 1)
+                                    + (tw0 + 1)*math.log(p0))
+    res -= np.max(res)
+    res = np.exp(res)
+    res /= np.sum(res)
+    return res
+
+def expect_hierarchical_three(a, d, N, p0):
+   etw0 = np.sum(np.arange(1,N+1)*np.sum(np.sum(post_hierarchical_three(a, d, N, p0), 0), 0))
+   etw1 = np.sum(np.arange(1,N+1)*np.sum(np.sum(post_hierarchical_three(a, d, N, p0), 2), 0))
+   etw2 = np.sum(np.arange(1,N+1)*np.sum(np.sum(post_hierarchical_three(a, d, N, p0), 2), 1))
+   return etw2, etw1, etw0
+
+def max_hierarchical_three(a, d, N, p0):
+   post = post_hierarchical_three(a, d, N, p0)
+   global_idx = np.unravel_index(np.argmax(post), post.shape)
+   m0 = np.argmax(np.sum(np.sum(post, 0), 0)) + 1
+   m1 = np.argmax(np.sum(np.sum(post, 2), 0)) + 1
+   m2 = np.argmax(np.sum(np.sum(post, 2), 1)) + 1
+   
+   c2 = np.argmax(post[:, global_idx[1], global_idx[2]])
+   c1 = np.argmax(post[c2, :, global_idx[2]])
+   c0 = np.argmax(post[c2, c1, :])
+
+
+   return (m2, m1, m0), np.array(global_idx) + 1, (c2 + 1, c1 + 1, c0 + 1)
+
   
 def joint_hierarchical(a,d,N,p0):
     res = np.ones((N,N))*-np.inf
@@ -289,9 +326,9 @@ def crp_particle_num_tables(a, d, N, p0, num_particles=1000, resample=False):
       cw = X[0,j,i-1]
       tw = X[1,j,i-1]
       f = (a + d * tw)*p0/((a + d*tw)*p0 + cw - tw*d)
+      p = (cw - tw*d + (a+tw*d)*p0)/(cw + a)
       X[0,j,i] = X[0,j,i-1] + 1 
       X[1,j,i] = X[1,j,i-1] + int(np.random.rand() < f)
-      p = (cw - tw*d + (a+tw*d)*p0)/(cw + a)
       W[j,i] = W[j,i-1] * p
     W[:,i] /= np.sum(W[:,i])
     if resample and 1./np.sum(np.square(W[:,i])) < 0.1*num_particles:
@@ -319,8 +356,8 @@ def full_crp_particle_num_tables(a, d, N, p0, num_particles=1000, resample=False
       probs[0:num_tables] = tables[:num_tables] - d
       probs[-1] = (a + d*num_tables)*p0
       sample = choice(probs, 1)[0]
-      X[sample,j,i] += 1
       p = (np.sum(tables) - num_tables*d + (a+num_tables*d)*p0)/(np.sum(tables) + a)
+      X[sample,j,i] += 1
       W[j,i] = W[j,i-1] * p
     W[:,i] /= np.sum(W[:,i])
     if resample and 1./np.sum(np.square(W[:,i])) < 0.1*num_particles:
@@ -413,6 +450,157 @@ def crp_fractional_num_tables(a, d, N, p0):
     f = (a + d * tw)*p0/((a + d*tw)*p0 + cw - tw*d)
     tw += f
     cw += 1
+  return tw
+
+
+def crp_fractional_hierarchical_two(a, d, N, p0):
+  cw1 = 0 # bottom
+  tw1 = 0
+  tw0 = 0 # top
+  for i in range(N):
+    p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+    f1 = (a + d * tw1)*p1/((a + d*tw1)*p1 + cw1 - tw1*d)
+    f0 = (a + d * tw0)*p0/((a + d*tw0)*p0 + tw1 - tw0*d) * f1
+    tw1 += f1
+    tw0 += f0
+    cw1 += 1
+  return tw1, tw0
+
+
+def crp_fractional_hierarchical_three(a, d, N, p0):
+  """Fractional approximate inference in a three-level
+  hierarchy."""
+  cw2 = 0 # bottom
+  tw2 = 0
+  tw1 = 0 # middle
+  tw0 = 0 # top
+  for i in range(N):
+    p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+    p2 = (tw2 - d*tw1 + (a + d*tw1)*p1)/(tw2 + a)
+    f2 = (a + d * tw2)*p2/((a + d*tw2)*p2 + cw2 - tw2*d)
+    f1 = (a + d * tw1)*p1/((a + d*tw1)*p1 + tw2 - tw1*d) * f2
+    f0 = (a + d * tw0)*p0/((a + d*tw0)*p0 + tw1 - tw0*d) * f1
+    tw2 += f2
+    tw1 += f1
+    tw0 += f0
+    cw2 += 1
+  return tw2, tw1, tw0
+  
+def crp_optimize_hierarchical_three(a, d, N, p0):
+  """Iterative local optimization"""
+  cw2 = 0 # bottom
+  tw2 = 0
+  tw1 = 0 # middle
+  tw0 = 0 # top
+  for i in range(N):
+    cw2 += 1
+    for j in range(2):
+      p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+      p2 = (tw2 - d*tw1 + (a + d*tw1)*p1)/(tw2 + a)
+      post2 = post_t(a, d, cw2, 0, p2)
+      tw2 = np.argmax(post2) + 1
+      post1 = post_t(a, d, tw2, 0, p1)
+      tw1 = np.argmax(post1) + 1
+      post0 = post_t(a,d, tw1, 0, p0)
+      tw0 = np.argmax(post0) + 1
+  return tw2, tw1, tw0
+
+def crp_optimize_hierarchical_alt_three(a, d, N, p0):
+  """Iterative local optimization"""
+  cw2 = 0 # bottom
+  tw2 = 0
+  tw1 = 0 # middle
+  tw0 = 0 # top
+  for i in range(N):
+    cw2 += 1
+    for j in range(10):
+      p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+      p2 = (tw2 - d*tw1 + (a + d*tw1)*p1)/(tw2 + a)
+      post2 = post_t(a, d, cw2, 0, p2)
+      tw2 = np.argmax(post2) + 1
+      tw1 = tw2
+      tw0 = tw2
+  return tw2, tw1, tw0
+
+def crp_optimize_hierarchical_pairs_three(a, d, N, p0):
+  """Iterative local optimization"""
+  cw2 = 0 # bottom
+  tw2 = 0
+  tw1 = 0 # middle
+  tw0 = 0 # top
+  for i in range(N):
+    cw2 += 1
+    for j in range(1):
+      p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+      p2 = (tw2 - d*tw1 + (a + d*tw1)*p1)/(tw2 + a)
+      post1 = post_hierarchical(a, d, cw2, p1)
+      tw2, tw1 = np.array(np.unravel_index(np.argmax(post1), post1.shape)) + 1
+      post2 = post_hierarchical(a, d, tw2, p0)
+      tw1, tw0 = np.array(np.unravel_index(np.argmax(post2), post2.shape)) + 1
+
+  return tw2, tw1, tw0
+
+
+def post_direct(a, d, cw1, tw0):
+  out = np.zeros(cw1)
+  for i in range(cw1):
+    out[i] = (  libplump.logKramp(a + d, d, i)
+              - libplump.logKramp(a + 1, 1, i)
+              + log_stirling_cached(d, cw1, i + 1)
+              + log_stirling_cached(d, i + 1, tw0))
+  out -= np.max(out)
+  out = np.exp(out)
+  out /= np.sum(out)
+  return out
+
+  
+
+def crp_sample_hierarchical_direct(a, d, N, p0, num_samples, initPf=True):
+  """Direct gibbs sampler for two layer hierarchy"""
+  cw1 = 0 # bottom
+  tw1 = 0 # bottom
+  tw0 = 0 # top
+  res = []
+  if initPf:
+    for i in range(N):
+      p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+      f1 = (a + d * tw1)*p1/((a + d*tw1)*p1 + cw1 - tw1*d)
+      f0 = (a + d * tw0)*p0/((a + d*tw0)*p0 + tw1 - tw0*d)
+      if (np.random.rand() < f1):
+        tw1 +=1
+        if (np.random.rand() < f0):
+          tw0 +=1
+      cw1 += 1
+  else:
+    for i in range(N):
+      cw1 += 1
+      p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+      post = post_direct(a, d, cw1, tw0)
+      tw1_new = (choice(post, 1) + 1)[0]
+      post = post_t(a, d, tw1_new, 0, p0)
+      tw0 = (choice(post, 1) + 1)[0]
+      tw1 = tw1_new
+  for j in range(num_samples):
+    p1 = (tw1 - d*tw0 + (a + d*tw0)*p0)/(tw1 + a)
+    p2 = (cw1 - d*tw1 + (a + d*tw1)*p1)/(cw1 + a)
+    res.append((p2, tw0, tw1))
+    post = post_direct(a, d, cw1, tw0)
+    tw1 = (choice(post, 1) + 1)[0]
+    post = post_t(a, d, tw1, 0, p0)
+    tw0 = (choice(post, 1) + 1)[0]
+  return res
+
+def crp_fractional_num_tables_p0s(a, d, customers, p0dict):
+  cw = defaultdict(lambda: 0)
+  tw = defaultdict(lambda: 0)
+  c = 0
+  t = 0
+  for c in customers:
+    f = (a + d * t)*p0dict[c]/((a + d*t)*p0dict[c] + cw[c] - tw[c]*d)
+    tw[c] += f
+    t += f
+    cw[c] += 1
+    c += 1
   return tw
 
 
@@ -552,20 +740,142 @@ def get_errorbars(fun, K=10):
     sd = np.std(data,0)
     return m, sd
 
-def plot_crp_particle_filters(a, d, N, p0, K=10):
-   m1, s1 = get_errorbars(lambda:  full_crp_particle_num_tables(a,d,N,p0,100)[1],K)
-   plt.errorbar(range(1,N+1), m1, s1,fmt='b',alpha=0.5)
-   m2, s2 = get_errorbars(lambda: crp_particle_num_tables(a,d,N,p0,100)[1], K)
-   plt.errorbar(range(1,N+1), m2, s2,fmt='r',alpha=0.5)
-   m3, s3 = get_errorbars(lambda: crp_particle_num_tables_enumerate(a,d,N,p0,20)[1], K)
-   plt.errorbar(range(1,N+1), m3, s3,fmt='g',alpha=0.5)
-   plt.plot(crp_particle_num_tables_enumerate(a,d,N,p0, 20, sample=False)[1],'c',alpha=0.5)
 
-   plt.plot([expected_num_tables(a, d,i+1, p0)[1] for i in range(N)],'k',linewidth=2)
+def plot_crp_fractional(a, d, N, p0):
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i, p0)[1] for i in range(1, N + 1)],'k',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'b--',linewidth=2)
    plt.grid()
    plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
    plt.xlabel("# customers of type $s$")
-   plt.ylabel('# tables')
+   plt.ylabel('$E[t_s]$')
+   plt.xlim(1,N)
+
+
+def plot_crp_fractional_hier_two(a, d, N, p0):
+   plt.plot(range(1,N+1),[np.sum(np.arange(1,i+1)*np.sum(post_hierarchical(a, d, i, p0), 0)) for i in range(1, N + 1)],'k',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_hierarchical_two(a,d,c,p0)[1] for c in range(1,N+1)],'k--',linewidth=2)
+   plt.plot(range(1,N+1),[np.sum(np.arange(1,i+1)*np.sum(post_hierarchical(a, d, i, p0), 1)) for i in range(1, N + 1)],'r',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_hierarchical_two(a,d,c,p0)[0] for c in range(1,N+1)],'r--',linewidth=2)
+   plt.grid()
+   plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('$E[t_s]$')
+   plt.xlim(1,N)
+
+
+def plot_crp_fractional_hier_three(a, d, N, p0):
+   plt.plot(range(1,N+1),[np.sum(np.arange(1,i+1)*np.sum(np.sum(post_hierarchical_three(a, d, i, p0), 0), 0)) for i in range(1, N + 1)],'k',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_hierarchical_three(a,d,c,p0)[2] for c in range(1,N+1)],'k--',linewidth=2, label="_nolegend_")
+
+
+   plt.plot(range(1,N+1),[np.sum(np.arange(1,i+1)*np.sum(np.sum(post_hierarchical_three(a, d, i, p0), 2), 0)) for i in range(1, N + 1)],'r',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_hierarchical_three(a,d,c,p0)[1] for c in range(1,N+1)],'r--',linewidth=2, label="_nolegend_")
+   
+   plt.plot(range(1,N+1),[np.sum(np.arange(1,i+1)*np.sum(np.sum(post_hierarchical_three(a, d, i, p0), 2), 1)) for i in range(1, N + 1)],'b',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_hierarchical_three(a,d,c,p0)[0] for c in range(1,N+1)],'b--',linewidth=2, label="_nolegend_")
+
+   plt.grid()
+   plt.title(r"Marginal Posterior $\mathrm{E}[t_s]$, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('$E[t_s]$')
+   plt.xlim(1,N)
+   plt.legend(["top", "middle", "bottom"], "upper left")
+
+
+def plot_crp_fractional_p0s(a, d, N):
+   p0 = 0.1
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i, p0)[1] for i in range(1, N + 1)],'k',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'k--',linewidth=2, label="_nolegend_")
+   p0 = 0.4
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i, p0)[1] for i in range(1, N + 1)],'r',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'r--',linewidth=2, label="_nolegend_")
+   p0 = 0.7
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i, p0)[1] for i in range(1, N + 1)],'b',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'b--',linewidth=2, label="_nolegend_")
+   p0 = 0.95
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i, p0)[1] for i in range(1, N + 1)],'g',linewidth=2)
+   plt.plot(range(1,N+1),[crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'g--',linewidth=2, label="_nolegend_")
+
+
+   plt.grid()
+   plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$"%(a,d))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('$E[t_s]$')
+   plt.xlim(1,N)
+   plt.legend(["H(s) = 0.1",
+               "H(s) = 0.4",
+               "H(s) = 0.7",
+               "H(s) = 0.95"], "upper left")
+
+
+def plot_maximization(a, d, N, p0):
+  m2s = []
+  m1s = []
+  m0s = []
+  ml2s = []
+  ml1s = []
+  ml0s = []
+  ma2s = []
+  ma1s = []
+  ma0s = []
+  g2s = []
+  g1s = []
+  g0s = []
+  for i in range(1, N+1):
+    ml2, ml1, ml0 = crp_optimize_hierarchical_three(a, d, i, p0)
+    m2, m1, m0 = crp_optimize_hierarchical_pairs_three(a, d, i, p0)
+    m2s.append(m2)
+    m1s.append(m1)
+    m0s.append(m0)
+    ml2s.append(ml2)
+    ml1s.append(ml1)
+    ml0s.append(ml0)
+    margmax, globmax, _ = max_hierarchical_three(a, d, i, p0)
+    ma2s.append(margmax[0])
+    ma1s.append(margmax[1])
+    ma0s.append(margmax[2])
+    g2s.append(globmax[0])
+    g1s.append(globmax[1])
+    g0s.append(globmax[2])
+  print g0s
+  plt.plot(range(1, N + 1), m2s, "r", alpha=0.7, linewidth=2)
+  plt.plot(range(1, N + 1), m1s, "r--", label="_nolegend_", linewidth=2, alpha=0.7)
+  plt.plot(range(1, N + 1), m0s, "r-.", label="_nolegend_", linewidth=2, alpha=0.7)
+  plt.plot(range(1, N + 1), ml2s, "g", alpha=0.7, linewidth=2)
+  plt.plot(range(1, N + 1), ml1s, "g--", label="_nolegend_", linewidth=2, alpha=0.7)
+  plt.plot(range(1, N + 1), ml0s, "g-.", label="_nolegend_", linewidth=2, alpha=0.7)
+  # plt.plot(range(1, N + 1), ma2s,"b", linewidth=2)
+  # plt.plot(range(1, N + 1), ma1s,"b--", label="_nolegend_", linewidth=2)
+  # plt.plot(range(1, N + 1), ma0s,"b-.", label="_nolegend_", linewidth=2)
+  plt.plot(range(1, N + 1), g2s, "k", linewidth=2, alpha=0.7)
+  plt.plot(range(1, N + 1), g1s, "k--", label="_nolegend_", linewidth=2, alpha=0.7)
+  plt.plot(range(1, N + 1), g0s, "k-.", label="_nolegend_", linewidth=2, alpha=0.7)
+  plt.grid()
+  plt.title(r"Posterior Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+  plt.xlabel("# customers of type $s$")
+  plt.ylabel('$t_s$')
+  plt.xlim(1,N)
+  plt.legend(["pairwise", "local", "global"], "upper left")
+
+
+def plot_crp_particle_filters(a, d, N, p0, K=10):
+   #m1, s1 = get_errorbars(lambda:  full_crp_particle_num_tables(a,d,N,p0,100)[1],K)
+   #plt.errorbar(np.arange(1,N+1)-0.3, m1, s1,fmt='b',alpha=0.5)
+   m1, s1 = get_errorbars(lambda: crp_particle_num_tables(a,d,N,p0,1)[1], K)
+   plt.errorbar(np.arange(1,N+1), m1, s1,fmt='b',alpha=0.5)
+   m2, s2 = get_errorbars(lambda: crp_particle_num_tables(a,d,N,p0,100)[1], K)
+   plt.errorbar(np.arange(1,N+1), m2, s2,fmt='r',alpha=0.5)
+   m3, s3 = get_errorbars(lambda: crp_particle_num_tables_enumerate(a,d,N,p0,20)[1], K)
+   plt.errorbar(np.arange(1,N+1)+0.3, m3, s3,fmt='g',alpha=0.5)
+   plt.plot(range(1,N+1),crp_particle_num_tables_enumerate(a,d,N,p0, 20, sample=False)[1],'c',linewidth=2)
+
+   plt.plot(range(1,N+1),[expected_num_tables(a, d,i+1, p0)[1] for i in range(N)],'k',linewidth=2)
+   plt.plot(range(1, N+1), [crp_fractional_num_tables(a,d,c,p0) for c in range(1,N+1)],'b--',linewidth=2)
+   plt.grid()
+   plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
+   plt.xlabel("# customers of type $s$")
+   plt.ylabel('$E[t_s]$')
+   plt.xlim(1,N)
 
 def plot_crp_particle_filter_variance(a, d, N, p0, num_particles_list, K=10):
    m1, s1 = get_errorbars(lambda:  [crp_particle_num_tables(a,d,N,p0,i)[1][-1] for i in num_particles_list],K)
@@ -596,6 +906,7 @@ def plot_enumerate_particle_filters(a, d, N, p0, num_particles=100):
    plt.title(r"Posterior Expected Number of Tables, $\alpha=%.1f$, $d=%.1f$, $H(s)=%.1f$"%(a,d,p0))
    plt.xlabel("# customers of type $s$")
    plt.ylabel('# tables')
+
 
 
 

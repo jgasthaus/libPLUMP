@@ -201,7 +201,7 @@ class GradientParameters : public IParameters {
     
     void stepParameterGradient(double stepSize);
 
-    d_vec approximateParameterGradient(
+    std::pair<d_vec, double> approximateParameterGradient(
         const IAddRemoveRestaurant& restaurant,
         const WrappedNodeList& path, 
         const d_vec& prob_path, 

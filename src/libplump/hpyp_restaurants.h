@@ -25,6 +25,7 @@
 #include "libplump/pool.h"
 #include "libplump/node_manager.h" // for IPayloadFactory
 #include "libplump/serialization.h"
+#include "libplump/stirling.h"
 #include "libplump/hpyp_restaurant_interface.h"
 
 namespace gatsby { namespace libplump {
@@ -582,6 +583,79 @@ class FractionalRestaurant : public StirlingCompactRestaurant {
     const FractionalRestaurant::PayloadFactory payloadFactory;
 };
 
+
+class LocallyOptimalRestaurant : public StirlingCompactRestaurant {
+  public:
+    LocallyOptimalRestaurant() : StirlingCompactRestaurant(), payloadFactory() {}
+
+    virtual ~LocallyOptimalRestaurant() {}
+    
+    double computeProbability(void*  payloadPtr,
+                              e_type type, 
+                              double parentProbability,
+                              double discount, 
+                              double concentration) const;
+    
+    
+    double addCustomer(void*  payloadPtr, 
+                     e_type type, 
+                     double parentProbability, 
+                     double discount, 
+                     double concentration,
+                     void* additionalData = NULL,
+                     double count = 1) const;
+    
+    
+    double removeCustomer(void* payloadPtr, 
+                        e_type type,
+                        double discount,
+                        void* additionalData, 
+                        double count = 1) const;
+    
+    
+    void updateAfterSplit(void* longerPayloadPtr, 
+                          void* shorterPayloadPtr, 
+                          double discountBeforeSplit, 
+                          double discountAfterSplit, 
+                          bool parentOnly = false) const;
+    
+
+    const IPayloadFactory& getFactory() const { return this->payloadFactory; }
+  protected:  
+    
+    class Payload : public PoolObject<Payload> {
+      public:
+        // per type: cw and tw
+        typedef std::pair<double, double> Arrangement;
+        //typedef MiniMap<e_type, Arrangement> TableMap;
+        typedef std::map<e_type, Arrangement> TableMap;
+
+
+        Payload() : tableMap(), sumCustomers(0), sumTables(0) {}
+
+        TableMap tableMap;
+        double sumCustomers;
+        double sumTables;
+    };
+
+    class PayloadFactory : public IPayloadFactory {
+      public: 
+      PayloadFactory() {}
+      void* make() const {
+        return new Payload();
+      };
+      
+      void recycle(void* payloadPtr) const {
+        delete (Payload*)payloadPtr;
+      }
+    
+      void save(void* payloadPtr, OutArchive& oa) const;
+      void* load(InArchive& ia) const;
+    };
+
+    const LocallyOptimalRestaurant::PayloadFactory payloadFactory;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 ///////////////////   INLINE FUNCTIONS   ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -614,6 +688,22 @@ inline double pypExpectedNumberOfTables(double alpha, double d, double n) {
   if (d != 0) {
     return std::exp(logKramp(alpha + d, 1, n) - std::log(d) - logKramp(alpha + 1, 1, n - 1)) - alpha/d;
   }
+}
+
+inline double logPosteriorValue(double alpha, double d, int cw, int tw, int t, double p0, d_vec_vec& stirling_table) {
+    return (  logKramp(alpha + d, d, t - 1.0) 
+            + log_get_stirling_from_table(stirling_table, cw, tw)
+            + tw * log(p0)
+           );
+}
+
+inline d_vec logPosteriorProp(double alpha, double d, int cw, int otherT, double p0) {
+    d_vec post;
+    d_vec_vec stirling_table = log_gen_stirling_table(d, cw);
+    for (int tw = 1; tw <= cw; ++tw) {
+        post.push_back(logPosteriorValue(alpha, d, cw, tw, otherT + tw, p0,stirling_table));
+    }
+    return post;
 }
 
 

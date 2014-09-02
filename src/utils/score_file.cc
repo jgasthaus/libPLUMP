@@ -106,6 +106,9 @@ IAddRemoveRestaurant* getRestaurant(po::variables_map& vm) {
     case 8:
       cerr << "getRestaurant(): Using ExpectedTablesCompactRestaurant" << endl;
       return new ExpectedTablesCompactRestaurant();
+    case 9:
+      cerr << "getRestaurant(): Using LocallyOptimalRestaurant" << endl;
+      return new LocallyOptimalRestaurant();
   }
   cout << "Unknown restaurant type (--restaurant)!";
   exit(1);
@@ -224,6 +227,10 @@ double score_file(po::variables_map& vm) {
         cout << "loss (avg): " << prob2loss<double>(average(sample_predictions)) << endl;
       }
     }
+
+    d_vec online_losses;
+    online_losses = model.computeLosses(start_pos, seq.size());
+    cout << "loss (online): " << mean(online_losses) << endl;
   }
 
   if (vm.count("save-serialized-nodes")) {
@@ -235,6 +242,7 @@ double score_file(po::variables_map& vm) {
     cout << parameters->getDiscount(i) << ", ";
   }
   cout << endl;
+  cout << "Concentration: " << parameters->getConcentration(1., -1, 0) << endl;
 
 
   return mean(losses);

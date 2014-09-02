@@ -4,6 +4,8 @@ import sys
 import numpy as np
 import scipy.optimize as opt
 
+NUM_FUNC_EVAL = 20
+
 initial = np.array([0, 0.05, 0.7, 0.8, 0.82, 0.84, 0.88, 0.91, 0.92, 0.93, 0.94, 0.95])
 #initial = np.array([0.5]*12)
 
@@ -24,6 +26,7 @@ parameters.alpha = initial[0]
 train = aio.readBText(sys.argv[1])
 valid = aio.readBText(sys.argv[2])
 test  = aio.readBText(sys.argv[3])
+num_samples = int(sys.argv[4])
 
 #seq = libplump.vectori(range(10))
 alldata = train.tolist() + valid.tolist() +test.tolist()
@@ -50,19 +53,32 @@ def testLoss():
   probs = model.predictSequence(len(train) + len(valid), len(train)+len(valid) + len(test))
   return np.mean(-np.log2(probs))
 
+def testProbs():
+  return model.predictSequence(len(train) + len(valid), len(train)+len(valid) + len(test))
+
+def onlineTestLoss():
+  losses = model.computeLosses(len(train) + len(valid), len(train)+len(valid) + len(test))
+  return np.mean(losses)
+
 bounds = [(0, None)] +  [(0.001, 0.999)]*11
 
 x = initial
+probs = []
 for i in range(10):
   print "starting optimization iteration", i
-  (x, f, d) = opt.fmin_l_bfgs_b(validLoss, x, maxfun=5, bounds = bounds, approx_grad = True)
-  print validLoss(x)
+  (x, f, d) = opt.fmin_l_bfgs_b(validLoss, x, maxfun=NUM_FUNC_EVAL, bounds = bounds, approx_grad = True)
+  print "valid loss", validLoss(x)
   print "test loss ", testLoss()
-  print "running sampler"
-  model.runGibbsSampler()
-  model.runGibbsSampler()
-  print validLoss(x)
+  probs.append(testProbs())
+  print "mean test loss (across samples)", np.mean(-np.log2(np.mean(np.array(probs),0)))
+  print "mean test loss (across samples)", np.mean(-np.log2(np.cumsum(np.array(probs)[::-1],0)/(np.arange(len(probs)) + 1)[:,None]))
+  for j in range(num_samples):
+    print "running sampler"
+    model.runGibbsSampler()
+  print "valid loss", validLoss(x)
   print "test loss ", testLoss()
+print "online test loss", onlineTestLoss()
+print "mean loss", np.mean(-np.log2(np.mean(np.array(probs),0)))
 
 
 

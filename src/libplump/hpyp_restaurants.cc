@@ -1630,4 +1630,138 @@ void* FractionalRestaurant::PayloadFactory::load(InArchive& ia) const {
   return NULL;
 }
 
+
+// == LocallyOptimalRestaurant
+
+double LocallyOptimalRestaurant::addCustomer(void*  payloadPtr, 
+                                       e_type type, 
+                                       double parentProbability, 
+                                       double discount, 
+                                       double concentration, 
+                                       void*  additionalData,
+                                       double count) const {
+  tracer << "LocallyOptimalRestaurant::addCustomer(" << type << "," 
+         << parentProbability << "," << discount << "," << concentration 
+         << ", " << additionalData
+         << ", " << count
+         << ")" << std::endl;
+
+  Payload& payload = *((Payload*)payloadPtr);
+  std::pair<double, double>& p = payload.tableMap[type];
+  tracer << p.first << ", " << p.second << ", " <<  payload.sumCustomers << ", " << payload.sumTables << std::endl;
+  double& cw = p.first;
+  cw += count;
+  payload.sumCustomers += count;
+
+  d_vec post = logPosteriorProp(concentration, discount, cw, payload.sumTables - p.second, parentProbability);
+  int max = (std::max_element(post.begin(), post.end()) - post.begin());
+  int diff_t = (max + 1) - p.second;
+  p.second += diff_t;
+  payload.sumTables += diff_t;
+  return diff_t;
+}
+
+
+double LocallyOptimalRestaurant::removeCustomer(
+    void* payloadPtr, e_type type, double discount,
+    void* additionalData, 
+    double count) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  std::pair<double, double>& p = payload.tableMap[type];
+  assert(p.first >= p.second);
+  assert(payload.sumCustomers >= p.first);
+  assert(payload.sumTables >= p.second);
+  double frac_t_equal = p.second / p.first * count; // HACK: split equally
+  double frac_t_approx = (p.second - count) * std::pow(discount, count) * std::pow(p.first, discount) / 
+              (p.first - count) / std::pow(p.first - count, discount) * count;
+  //std::cout << "equal: " << frac_t_equal << std::endl;
+  //std::cout << "approx: " << frac_t_approx << std::endl;
+  double frac_t = frac_t_equal;
+  if (p.first - count > 0 && frac_t_approx > 0 && frac_t_approx <= count) {
+      frac_t = frac_t_approx;
+  }
+  assert(frac_t >= 0);
+  p.first -= count;
+  p.second -= frac_t;
+  //*it).second = std::make_pair(x.first - count, x.second - frac_t);
+  payload.sumCustomers -= count;
+  payload.sumTables -= frac_t;
+  //std::cout << "del: " << payload.sumTables << ", " << x.first << ", "<< x.second << ", " << ", " << frac_t << std::endl;
+  return frac_t;
+}
+
+double LocallyOptimalRestaurant::computeProbability(void*  payloadPtr,
+                                                e_type type, 
+                                                double parentProbability,
+                                                double discount, 
+                                                double concentration) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  
+  if (payload.sumCustomers == 0) {
+    return parentProbability;
+  }
+
+  Payload::TableMap::iterator it = payload.tableMap.find(type);
+  double cw = 0;
+  double tw = 0;
+  if (it != payload.tableMap.end()) {
+    cw = (*it).second.first;
+    tw = (*it).second.second;
+  }
+
+  return computeHPYPPredictiveDouble(cw, // cw
+                               tw, // tw
+                               payload.sumCustomers, // c
+                               payload.sumTables, // t
+                               parentProbability,
+                               discount,
+                               concentration);
+}
+
+
+void LocallyOptimalRestaurant::updateAfterSplit(void* longerPayloadPtr, 
+                                           void* shorterPayloadPtr, 
+                                           double discountBeforeSplit, 
+                                           double discountAfterSplit,
+                                           bool parentOnly) const {
+  tracer << "LocallyOptimalRestaurant::updateAfterSplit("
+         << this->toString(longerPayloadPtr)
+         << ", " << this->toString(shorterPayloadPtr)
+         << ", " << discountBeforeSplit
+         << ", " << discountAfterSplit
+         << ")"  << std::endl;
+  
+  Payload& payload = *((Payload*)longerPayloadPtr);
+  Payload& newParent = *((Payload*)shorterPayloadPtr);
+    
+  // make sure the parent is empty
+  assert(newParent.sumCustomers == 0);
+  assert(newParent.sumTables == 0);
+  assert(newParent.tableMap.size() == 0);
+
+  for(Payload::TableMap::iterator it = payload.tableMap.begin();
+      it != payload.tableMap.end(); ++it) {
+    e_type type = (*it).first;
+    // copy to parent
+    std::pair<double, double> x = (*it).second;
+    newParent.tableMap[type] = std::pair<double, double>(x.second, x.second); 
+    newParent.sumCustomers += x.second;
+    newParent.sumTables += x.second;
+  }
+}
+
+
+void LocallyOptimalRestaurant::PayloadFactory::save(
+    void* payloadPtr, OutArchive& oa) const {
+  //oa << *((Payload*)payloadPtr);
+}
+
+
+void* LocallyOptimalRestaurant::PayloadFactory::load(InArchive& ia) const {
+  //Payload* p = new Payload();
+  //ia >> *p;
+  //return p;
+  return NULL;
+}
+
 }} // namespace gatsby::libplump
