@@ -173,8 +173,11 @@ class HPYPModel {
 
     /**
      * Run one iteration of Gibbs sampling in the model.
+     *
+     * If directGibbs is true, run the direct Gibbs sampler
+     * instead of the add/remove sampler.
      */
-    void runGibbsSampler();
+    void runGibbsSampler(bool directGibbs);
 
     /**
      * Return a string representation of entire model.
@@ -188,6 +191,9 @@ class HPYPModel {
      * parent restaurant.
      */
     bool checkConsistency() const;
+    
+    
+    double computeLogJoint() const;
 
 
   private:
@@ -251,19 +257,32 @@ class HPYPModel {
                      const WrappedNode& nodeC);
 
 
-    void gibbsSamplePath(const WrappedNodeList& path, 
+    void addRemoveSamplePath(const WrappedNodeList& path, 
                          const d_vec& discountPath, 
                          const d_vec& concentrationPath, 
                          const PayloadDataPath& payloadDataPath,
                          double baseProb);
     
+    void directGibbsSamplePath(const WrappedNodeList& path, 
+                         const d_vec& discountPath, 
+                         const d_vec& concentrationPath, 
+                         const PayloadDataPath& payloadDataPath,
+                         double baseProb);
+
+    double computeLogRestaurantProb(const WrappedNodeList& path, 
+                         const d_vec& discountPath, 
+                         const d_vec& concentrationPath, 
+                         const HPYPModel::PayloadDataPath& payloadDataPath,
+                         double baseProb) const;
+    
     boost::shared_ptr<void> makeAdditionalDataPtr(void* payload, 
                                                   double discount, 
-                                                  double concentration);
+                                                  double concentration) const;
     
 
     bool checkConsistency(const WrappedNode& node, 
                           const std::list<WrappedNode>& children) const;
+    
     
     
     class ToStringVisitor {
@@ -283,6 +302,16 @@ class HPYPModel {
         void operator()(WrappedNode& n, std::list<WrappedNode>& children);
 
         bool consistent;
+      private:
+        const HPYPModel& model;
+    };
+    
+    class LogJointVisitor {
+      public:
+        LogJointVisitor(const HPYPModel& model);
+        void operator()(WrappedNode& n, std::list<WrappedNode>& children);
+
+        double logJoint;
       private:
         const HPYPModel& model;
     };

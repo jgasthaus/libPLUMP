@@ -144,6 +144,8 @@ class stirling_generator_full_log {
     stirling_generator_full_log(double d, int c, int t);
 
     double ratio(int c, int t);
+    
+    double getLog(int c, int t);
 
     static std::string statsToString();
 

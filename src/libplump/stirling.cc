@@ -327,6 +327,19 @@ double stirling_generator_full_log::ratio(int c, int t) {
     return exp(log_get_stirling_from_table(table, c-1, t-1) - log_get_stirling_from_table(table, c, t));
 }
 
+
+double stirling_generator_full_log::getLog(int c, int t) {
+    if (c>c_max) {
+        num_extends++;
+        log_gen_stirling_table_extend(d,c,table);
+        c_max = c;
+        if (c_max > global_c_max) {
+            global_c_max = c_max;
+        }
+    }
+    return log_get_stirling_from_table(table, c, t);
+}
+
 std::string stirling_generator_full_log::statsToString() {
     std::ostringstream out;
     out << "Constructed: " << num_construct << ", extended: " << num_extends << ", calls: " << num_ratio_calls << ", c_max " << global_c_max;

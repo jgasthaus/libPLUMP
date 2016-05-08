@@ -208,6 +208,12 @@ inline void log2_vec(d_vec& in) {
   }
 }
 
+inline void exp_vec(d_vec& in) {
+  for (size_t i=0;i<in.size();i++){
+    in[i] = exp(in[i]);
+  }
+}
+
 /**
  * Multiply all elements of a vector by a constant.
  */
@@ -225,6 +231,22 @@ template<typename elem_t>
   inline void add_vec(std::vector<elem_t>& in, elem_t add) {
     for (size_t i=0;i<in.size();i++){
       in[i] = in[i] + add;
+    }
+  }
+
+/**
+ * Subtract max element fromall elements of a vector.
+ */
+template<typename elem_t>
+  inline void subMax_vec(std::vector<elem_t>& in) {
+    elem_t max = *std::max_element(in.begin(), in.end());
+    // if (max == -INFINITY) {
+    //   for (size_t i=0;i<in.size();i++){
+    //     in[i] = 0;
+    //   }
+    // }
+    for (size_t i=0;i<in.size();i++){ 
+      in[i] = in[i] - max;
     }
   }
 
@@ -329,6 +351,7 @@ inline double logKramp(double base, double inc, double lim) {
 inline double kramp(double base, double inc, double lim) {
   return exp(logKramp(base, inc, lim));
 }
+
 
 
 static clock_t global_clock;

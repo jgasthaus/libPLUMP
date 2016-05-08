@@ -148,6 +148,7 @@ inline int sample_unnormalized_pdf(std::vector<double> pdf, int end_pos) {
          - pdf.begin();
 
     assert(x == 0 || pdf[x-1] != pdf[x]);
+    assert(x < pdf.size());
     return x;
 
 }

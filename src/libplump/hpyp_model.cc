@@ -25,6 +25,9 @@
 
 #include "libplump/utils.h"
 #include "libplump/subseq.h"
+#include "libplump/stirling.h"
+#include "libplump/random.h"
+#include "libplump/hpyp_restaurants.h"
 
 
 namespace gatsby { namespace libplump {
@@ -453,10 +456,10 @@ d_vec HPYPModel::predictiveDistributionWithMixing(l_type start,
 
 /**
  * Given a path from the root to some node (not a leaf), 
- * perform Gibbs sampling of the last node by repeatedly 
+ * perform add/remove Gibbs sampling of the last node by repeatedly 
  * removing and adding customers, cus times for each type s.
  */
-void HPYPModel::gibbsSamplePath(
+void HPYPModel::addRemoveSamplePath(
     const WrappedNodeList& path, 
     const d_vec& discountPath, 
     const d_vec& concentrationPath, 
@@ -556,9 +559,149 @@ void HPYPModel::gibbsSamplePath(
 }
 
 
+/**
+ * Given a path from the root to some node (not a leaf), 
+ * perform add/remove Gibbs sampling of the last node by repeatedly 
+ * removing and adding customers, cus times for each type s.
+ */
+void HPYPModel::directGibbsSamplePath(
+    const WrappedNodeList& path, 
+    const d_vec& discountPath, 
+    const d_vec& concentrationPath, 
+    const HPYPModel::PayloadDataPath& payloadDataPath,
+    double baseProb) {
+  assert(path.size() > 0);
+  assert(path.size() == discountPath.size());
+  assert(path.size() == concentrationPath.size());
+
+  bool useAdditionalData = payloadDataPath.size() == path.size();
+  // XXX: HACK! We assume this is the type of addData for the used restaurant
+  stirling_generator_full_log *stirlingGenCurrent = NULL;
+  stirling_generator_full_log *stirlingGenParent = NULL;
+  void* main = path.back().payload;
+  const BaseCompactRestaurant& r = (BaseCompactRestaurant&)this->restaurant; // shortcut
+  
+  IHPYPBaseRestaurant::TypeVector types = r.getTypeVector(main);
+  for(IHPYPBaseRestaurant::TypeVectorIterator it = types.begin(); 
+      it != types.end(); ++it) { // for each type of customer 
+
+    e_type type = *it;
+    l_type cw = r.getC(main, type);
+    
+    if (cw == 1) {
+      continue; // no point in reseating in a 1 customer restaurant
+    }
+
+    WrappedNodeList::const_iterator current;
+    current = --path.end(); // set current to last restaurant in path
+
+    // index into d/alpha vectors for current restaurant
+    int j = discountPath.size() - 1;
+
+    bool goUp = true;
+    while(goUp && j != -1) {
+      goUp = false;
+      stirlingGenCurrent = (stirling_generator_full_log*)payloadDataPath[j].get();
+      void* currentPayload = (*current).payload;
+      void* parentPayload = NULL; // initialized below
+      int currentCw = r.getC(currentPayload, type);
+      int currentTw = r.getT(currentPayload, type);
+      int otherT = r.getT(currentPayload) - currentTw;
+      std::vector<double> logProbs(currentCw, 0);
+      std::vector<double> logProbs1(currentCw, 0);
+      std::vector<double> logProbs2(currentCw, 0);
+      std::vector<double> logProbs3(currentCw, 0);
+      std::vector<double> logProbs4(currentCw, 0);
+      if (j > 0) { // not at the top, so we have a CRP parent
+        stirlingGenParent = (stirling_generator_full_log*)payloadDataPath[j-1].get();
+        current--; // move to parent
+        parentPayload = (*current).payload;
+        current++;
+        
+        int parentTw = r.getT(parentPayload, type);
+        int parentCw = r.getC(parentPayload, type);
+        int parentOtherC = r.getC(parentPayload) - currentTw;
+        for (int tw = 1; tw <= currentCw; ++tw) {
+          int newParentCw = parentCw - currentTw + tw;
+          if (newParentCw < parentTw) {
+            logProbs4[tw-1] = -INFINITY;
+          } else {
+            logProbs1[tw-1] = logKramp(concentrationPath[j] + discountPath[j], discountPath[j], otherT + tw - 1);
+            logProbs2[tw-1] = - logKramp(concentrationPath[j-1] + 1, 1, parentOtherC + tw - 1);
+            logProbs3[tw-1] = stirlingGenCurrent->getLog(currentCw, tw);
+            logProbs4[tw-1] = stirlingGenParent->getLog(newParentCw, parentTw);
+            //std::cerr <<  logKramp(concentrationPath[j] + discountPath[j], discountPath[j], otherT + tw - 1) << std::endl;
+            //std::cerr <<  logKramp(concentrationPath[j-1], 1, parentOtherC + tw - 1)<< std::endl;
+            //std::cerr <<  stirlingGenCurrent->getLog(cw, tw)<< std::endl;
+            //std::cerr << cw << ", " << tw << std::endl;
+            //std::cerr <<  stirlingGenParent->getLog(newParentCw, parentTw)<< std::endl;
+            //std::cerr << newParentCw << ", " << parentTw << std::endl;
+          }
+        }
+        //std::cerr << parentCw << ", " << parentTw << ", " << parentOtherC << ", " << currentTw << ", " << otherT << std::endl;
+      } else { // at the root, take base prob into account
+        for (int tw = 1; tw <= currentCw; ++tw) {
+          logProbs1[tw-1] = logKramp(concentrationPath[j] + discountPath[j], discountPath[j], otherT + tw - 1);
+          logProbs2[tw-1] = stirlingGenCurrent->getLog(currentCw, tw);
+          logProbs3[tw-1] = tw * log(baseProb);
+        }
+      }
+      // subtract max for stability
+      //std::cerr << iterableToString(logProbs1) << std::endl;
+      //std::cerr << iterableToString(logProbs2) << std::endl;
+      //std::cerr << iterableToString(logProbs3) << std::endl;
+      //std::cerr << iterableToString(logProbs4) << std::endl;
+      subMax_vec(logProbs1);
+      subMax_vec(logProbs2);
+      subMax_vec(logProbs3);
+      subMax_vec(logProbs4);
+      add_vec(logProbs, logProbs1);
+      add_vec(logProbs, logProbs2);
+      add_vec(logProbs, logProbs3);
+      add_vec(logProbs, logProbs4);
+      subMax_vec(logProbs);
+
+
+      //std::cerr << iterableToString(logProbs1) << std::endl;
+      //std::cerr << iterableToString(logProbs2) << std::endl;
+      //std::cerr << iterableToString(logProbs3) << std::endl;
+      //std::cerr << iterableToString(logProbs4) << std::endl;
+      //std::cerr << iterableToString(logProbs) << std::endl;
+      exp_vec(logProbs);
+      //std::cerr << iterableToString(logProbs) << std::endl;
+      // if (max == -INFINITY) { // if all choices are improbable, choose uniformly
+      //     // we can do better by normalizing the component individually
+      //   for (int ii = 0; ii < logProbs.size(); ++ii)
+      //     logProbs[ii] = 1.0;
+      // }
+      //std::cerr << iterableToString(logProbs) << std::endl;
+      int sampledTw = sample_unnormalized_pdf(logProbs, 0) + 1;
+      //std::cerr << "Old tw: " << currentTw << ", newTw: " << sampledTw << std::endl;
+
+
+      r.setT(currentPayload, type, sampledTw);
+      if (j > 0) { 
+        int newCw =  r.getC(parentPayload, type) - currentTw + sampledTw;
+        assert(newCw >= r.getT(parentPayload, type));
+        r.setC(parentPayload, type, newCw);
+      }
+
+      if (sampledTw != currentTw) {
+        --current;
+        --j;
+      } else {
+        goUp = false;
+      }
+    }
+
+  }
+
+}
+
+
 boost::shared_ptr<void> HPYPModel::makeAdditionalDataPtr(void* payload, 
                                                          double discount, 
-                                                         double concentration) {
+                                                         double concentration) const {
   return boost::shared_ptr<void>(
       this->restaurant.createAdditionalData(payload,
         discount,
@@ -569,7 +712,7 @@ boost::shared_ptr<void> HPYPModel::makeAdditionalDataPtr(void* payload,
 }
 
 
-void HPYPModel::runGibbsSampler() {
+void HPYPModel::runGibbsSampler(bool directGibbs) {
   ContextTree::DFSPathIterator pathIterator = contextTree.getDFSPathIterator();
   d_vec discountPath = parameters.getDiscounts(*pathIterator);
   d_vec concentrationPath = parameters.getConcentrations(*pathIterator, 
@@ -586,8 +729,13 @@ void HPYPModel::runGibbsSampler() {
     j++;
   }
 
-  this->gibbsSamplePath(*pathIterator, discountPath, concentrationPath,
-                        payloadDataPath, baseProb);
+  if (directGibbs) {
+    this->directGibbsSamplePath(*pathIterator, discountPath, concentrationPath,
+                                payloadDataPath, baseProb);
+  } else {
+    this->addRemoveSamplePath(*pathIterator, discountPath, concentrationPath,
+                              payloadDataPath, baseProb);
+  }
 
   size_t pathLength = (*pathIterator).size();
   
@@ -649,8 +797,13 @@ void HPYPModel::runGibbsSampler() {
            << std::endl;
     
     
-    this->gibbsSamplePath(*pathIterator, discountPath, concentrationPath,
-                          payloadDataPath, baseProb);
+    if (directGibbs) {
+      this->directGibbsSamplePath(*pathIterator, discountPath, concentrationPath,
+                                  payloadDataPath, baseProb);
+    } else {
+      this->addRemoveSamplePath(*pathIterator, discountPath, concentrationPath,
+                                payloadDataPath, baseProb);
+    }
   }
 }
 
@@ -796,6 +949,135 @@ bool HPYPModel::checkConsistency() const {
   this->contextTree.visitDFSWithChildren(v);
   return v.consistent;
 }
+ 
+
+double HPYPModel::computeLogRestaurantProb(
+    const WrappedNodeList& path, 
+    const d_vec& discountPath, 
+    const d_vec& concentrationPath, 
+    const HPYPModel::PayloadDataPath& payloadDataPath,
+    double baseProb) const {
+  assert(path.size() > 0);
+  assert(path.size() == discountPath.size());
+  assert(path.size() == concentrationPath.size());
+
+  void* payload = path.back().payload;
+  const BaseCompactRestaurant& r = (BaseCompactRestaurant&)this->restaurant; // shortcut
+  double logProb = 0;
+  int j = discountPath.size() - 1;
+  l_type c = r.getC(payload); 
+  if (c == 1) {
+      // deterministic restaurant
+      return 0;
+  }
+  l_type t = r.getT(payload);
+  //std::cerr << "c: " << c << ", t: " << t << std::endl;
+  //std::cerr << "a: " << concentrationPath[j] << ", d: " << discountPath[j] << std::endl;
+  logProb += logKramp(concentrationPath[j] + discountPath[j], discountPath[j], t - 1);
+  //std::cerr << logProb << std::endl;
+  logProb -= logKramp(concentrationPath[j] + 1, 1, c - 1);
+  //std::cerr << logProb << std::endl;
+
+  
+  stirling_generator_full_log *stirlingGen = (stirling_generator_full_log*)payloadDataPath[j].get();
+  IHPYPBaseRestaurant::TypeVector types = r.getTypeVector(payload);
+  for(IHPYPBaseRestaurant::TypeVectorIterator it = types.begin(); 
+      it != types.end(); ++it) { // for each type of customer 
+
+    e_type type = *it;
+    l_type cw = r.getC(payload, type);
+    l_type tw = r.getT(payload, type);
+    
+    logProb += stirlingGen->getLog(cw, tw);
+
+    if (j == 0) { // at the root, take base prob into account
+      logProb += tw * log(baseProb);
+    }
+  }
+  //std::cerr << logProb << std::endl;
+  return logProb;
+}
+
+double HPYPModel::computeLogJoint() const {
+  double logJoint = 0;
+  ContextTree::DFSPathIterator pathIterator = contextTree.getDFSPathIterator();
+  d_vec discountPath = parameters.getDiscounts(*pathIterator);
+  d_vec concentrationPath = parameters.getConcentrations(*pathIterator, 
+                                                         discountPath);
+
+  // initialize payloadDataPath; by using shared_ptr with the proper
+  // destruction function, all clean-up should be automatic.
+  HPYPModel::PayloadDataPath payloadDataPath;
+  int j = 0;
+  for (WrappedNodeList::const_iterator it = (*pathIterator).begin();
+       it != (*pathIterator).end(); ++it) {
+      payloadDataPath.push_back(this->makeAdditionalDataPtr(
+            it->payload, discountPath[j], concentrationPath[j]));
+    j++;
+  }
+
+  logJoint += computeLogRestaurantProb(*pathIterator, discountPath, concentrationPath, payloadDataPath, baseProb);
+
+  size_t pathLength = (*pathIterator).size();
+  
+  while(pathIterator.hasMore()) { // loop over all paths in the tree
+    ++pathIterator;
+    if ((*pathIterator).size() == 0) {
+      break;
+    }
+
+    if ((*pathIterator).size() == pathLength) {
+      // sibling
+      discountPath.pop_back();
+      parameters.extendDiscounts(*pathIterator, discountPath);
+      concentrationPath.pop_back();
+      parameters.extendConcentrations(*pathIterator,
+                                      discountPath, 
+                                      concentrationPath);
+      payloadDataPath.pop_back();
+      payloadDataPath.push_back(
+          this->makeAdditionalDataPtr((*pathIterator).back().payload, 
+                                      discountPath.back(), 
+                                      concentrationPath.back()));
+
+    } else {
+      if ((*pathIterator).size() == pathLength - 1) {
+        // we went up -- just drop the last term
+        discountPath.pop_back();
+        concentrationPath.pop_back();
+        payloadDataPath.pop_back();
+      } else {
+        // we went up one and then down some number of levels -- recompute
+        discountPath.pop_back();
+        concentrationPath.pop_back();
+        parameters.extendDiscounts(*pathIterator, discountPath);
+        parameters.extendConcentrations(*pathIterator,
+                                        discountPath,
+                                        concentrationPath);
+        payloadDataPath.pop_back();
+        WrappedNodeList::const_iterator it = (*pathIterator).begin();
+        // move it to the first item not covered by the payloadDataPath
+        for (size_t i = 0; i < payloadDataPath.size(); ++i) {
+          ++it;
+        }
+        for (size_t i = payloadDataPath.size(); i < discountPath.size(); ++i) {
+          payloadDataPath.push_back(
+              this->makeAdditionalDataPtr(it->payload, 
+                                          discountPath[i], 
+                                          concentrationPath[i]));
+
+          ++it;
+        }
+        assert(it == (*pathIterator).end());
+      }
+    }
+    pathLength = (*pathIterator).size();
+
+    logJoint += computeLogRestaurantProb(*pathIterator, discountPath, concentrationPath, payloadDataPath, baseProb);
+    
+  }
+  return logJoint;
+}
 
 
 HPYPModel::ToStringVisitor::ToStringVisitor(seq_type& seq, 
@@ -826,6 +1108,24 @@ void HPYPModel::CheckConsistencyVisitor::operator()(
   consistent = consistent && nodeConsistent;
 }
 
+
+HPYPModel::LogJointVisitor::LogJointVisitor(
+    const HPYPModel& model) : logJoint(0), model(model) {}
+
+
+void HPYPModel::LogJointVisitor::operator()(
+    // FIXME
+    WrappedNode& n, std::list<WrappedNode>& children) {
+    int c = model.restaurant.getC(n.payload);
+    int t = model.restaurant.getT(n.payload);
+    IHPYPBaseRestaurant::TypeVector keys = 
+        model.restaurant.getTypeVector(n.payload);
+    for(IHPYPBaseRestaurant::TypeVectorIterator key_it = keys.begin();
+        key_it != keys.end(); ++key_it) {
+      int cw = model.restaurant.getC(n.payload, *key_it);
+      int tw = model.restaurant.getT(n.payload, *key_it);
+    }
+}
 
 std::string HPYPModel::toString() {
   HPYPModel::ToStringVisitor visitor(this->seq, this->restaurant);

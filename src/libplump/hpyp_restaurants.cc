@@ -849,6 +849,24 @@ l_type BaseCompactRestaurant::getT(void* payloadPtr, e_type type) const {
   }
 }
 
+void BaseCompactRestaurant::setT(void* payloadPtr, e_type type, l_type tw) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  payload.sumTables -= payload.tableMap[type].second;
+  payload.sumTables += tw;
+  payload.tableMap[type].second = tw;
+  assert(tw > 0);
+  assert(payload.sumTables > 0);
+}
+
+void BaseCompactRestaurant::setC(void* payloadPtr, e_type type, l_type cw) const {
+  Payload& payload = *((Payload*)payloadPtr);
+  payload.sumCustomers -= payload.tableMap[type].first;
+  payload.sumCustomers += cw;
+  payload.tableMap[type].first = cw;
+  assert(cw > 0);
+  assert(payload.sumCustomers > 0);
+}
+
 
 l_type BaseCompactRestaurant::getT(void* payloadPtr) const {
   return ((Payload*)payloadPtr)->sumTables;
@@ -1030,6 +1048,7 @@ bool BaseCompactRestaurant::checkConsistency(void* payloadPtr) const {
        it != payload.tableMap.end(); ++it) {
     sumCustomers += (*it).second.first;
     sumTables    += (*it).second.second;
+    consistent = consistent && ((*it).second.first >= (*it).second.second);
   }
 
   consistent =    (sumCustomers == payload.sumCustomers) 
@@ -1442,13 +1461,17 @@ double ExpectedTablesCompactRestaurant::computeProbability(void*  payloadPtr,
     tw = (*it).second.second;
   }
   double expectedNumberOfTables = pypExpectedNumberOfTables(concentration, discount, payload.sumTables);
-  std::cout << "t: " << payload.sumTables 
-            << ", c: " << payload.sumCustomers
-            << ", E[t]: " << expectedNumberOfTables
-            << ", tw: " << tw 
-            << ", E[t]*P0: " << expectedNumberOfTables * parentProbability << std::endl;  
+  //std::cout << "t: " << payload.sumTables 
+  //          << ", c: " << payload.sumCustomers
+  //          << ", E[t]: " << expectedNumberOfTables
+  //          << ", tw: " << tw 
+  //          << ", E[t]*P0: " << expectedNumberOfTables * parentProbability << std::endl;  
+  double twApprox = expectedNumberOfTables * parentProbability;
+  if (cw == 0) {
+      twApprox = 0.0;
+  }
   return computeHPYPPredictiveDouble(cw, // cw
-                               expectedNumberOfTables * parentProbability,
+                               twApprox, // tw
                                payload.sumCustomers, // c
                                expectedNumberOfTables, // t
                                parentProbability,

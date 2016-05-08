@@ -277,6 +277,8 @@ class BaseCompactRestaurant : public IAddRemoveRestaurant {
     l_type getC(void* payloadPtr) const;
     l_type getT(void* payloadPtr, e_type type) const;
     l_type getT(void* payloadPtr) const;
+    void setC(void* payloadPtr, e_type type, l_type cw) const;
+    void setT(void* payloadPtr, e_type type, l_type tw) const;
     
     double computeProbability(void*  payloadPtr,
                               e_type type, 
