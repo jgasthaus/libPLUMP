@@ -11,12 +11,16 @@ Jan Gasthaus <j.gasthaus@ucl.ac.uk>
 -------------------------------------------------------------------------------
 To get started with the code you will need a few additional things:
 
+  - CMake
+
   - Boost C++ libraries (recent version, 1.37 and 1.44 are known to work, but
     1.33 is known to not work due to some changes to Boost.Serialization)
     www.boost.org
 
   - GNU Scientific Library (tested with 1.12 and 1.14)
     www.gnu.org/software/gsl
+
+  - SWIG
 
   - Python 2.5 or higher (but not 3.x)
     www.python.org
@@ -27,18 +31,13 @@ To get started with the code you will need a few additional things:
 If you have the dependencies listed above installed in default locations then
 simply doing
 
-  # ./configure --with-python
+  # mkdir build && cd build
+  # cmake ..
   # make
 
 should configure libPLUMP (including the Python binding) and build the
 library. 
 
-If configure fails, check 
-
-  # ./configure --help
-
-to see whether you may need to pass additional options so that all
-dependencies can be located. 
 
 
 0.3 Check whether the build was successful
@@ -87,10 +86,9 @@ of the library.
 If you care about performance you may want to enable optimizations and
 disable all assertions in the code by using
 
-  # ./configure --with-python CPPFLAGS="-O3 -DNDEBUG"
-  # make
+  # export CXXFLAGS="-O3 -march=native -DNDEBUG"
 
-which should yield significant speedups.
+and then rerunning cmake/make, which should yield significant speedups.
 
 
 If you have problems, find bugs or want to contribute, let me know at <j.gasthaus@ucl.ac.uk>

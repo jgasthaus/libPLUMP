@@ -9,6 +9,7 @@ find_package(GSL REQUIRED)
 include_directories ("${PROJECT_SOURCE_DIR}/src")
 include_directories ("${PROJECT_SOURCE_DIR}/src/utils")
 add_subdirectory(src/libplump)
+add_subdirectory(bindings)
 
 add_executable(score_file src/utils/score_file.cc)
 target_link_libraries(score_file plump ${Boost_LIBRARIES} ${GSL_LIBRARIES})
