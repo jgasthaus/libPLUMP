@@ -39,7 +39,7 @@ static unsigned int num_types = 256;
  */
 d_vec predict(po::variables_map& vm, HPYPModel& m, int start_pos, seq_type seq) {
   d_vec predictive;
-  for(int i = start_pos + 1; i < (int)seq.size(); ++i) {    
+  for(int i = start_pos; i < (int)seq.size(); ++i) {    
     if (vm.count("sum")) {
         d_vec dist = m.predictiveDistribution(start_pos, i);
         if (!closeTo(sum(dist), 1)) {
@@ -163,7 +163,7 @@ double score_file(po::variables_map& vm) {
     Serializer nodeSerializer(vm["load-serialized-nodes"].as<string>());
     nodeSerializer.loadNodesAndPayloads(*nodeManager, restaurant->getFactory());
   } else {
-    int lag = vm["lag"].as<int>();
+    int lag = vm["train-lag"].as<int>();
     if (lag == 0) {
       losses = model.computeLosses(0, seq.size());
     } else {
@@ -183,7 +183,7 @@ double score_file(po::variables_map& vm) {
 
 
   if (vm.count("dump-losses")) {
-    iterableToCSVFile(losses,"losses");
+    iterableToCSVFile(losses,"train-losses");
   }
 
 
@@ -224,6 +224,9 @@ double score_file(po::variables_map& vm) {
           cout << model.toString() << endl;
         }
       }
+      if (vm.count("dump-losses")) {
+        iterableToCSVFile(predict(vm, model, start_pos, seq), "test-probs_0");
+      }
       d_vec_vec sample_predictions;
       for (int i = 0; i < vm["samples"].as<int>(); ++i) {
         cout << "sampling iteration iteration: " << i << endl;
@@ -231,6 +234,11 @@ double score_file(po::variables_map& vm) {
         sample_predictions.push_back(predict(vm, model, start_pos, seq));
         cout << "loss (this sample): " << prob2loss<double>(sample_predictions.back()) << endl;
         cout << "loss (avg): " << prob2loss<double>(average(sample_predictions)) << endl;
+        if (vm.count("dump-losses")) {
+          ostringstream dump_test_loss_fn;
+          dump_test_loss_fn << "test-probs_" << i + 1;
+          iterableToCSVFile(sample_predictions.back(), dump_test_loss_fn.str());
+        }
         if (vm.count("joint")) {
           double joint = model.computeLogJoint();
           cerr << joint << ", " 
@@ -241,7 +249,15 @@ double score_file(po::variables_map& vm) {
     }
 
     d_vec online_losses;
-    online_losses = model.computeLosses(start_pos, seq.size());
+    int lag = vm["lag"].as<int>();
+    if (lag == 0) {
+      online_losses = model.computeLosses(start_pos, seq.size());
+    } else {
+      online_losses = model.computeLossesWithDeletion(start_pos, seq.size(), lag);
+    }
+    if (vm.count("dump-losses")) {
+      iterableToCSVFile(online_losses,"online-test-losses");
+    }
     cout << "loss (online): " << mean(online_losses) << endl;
   }
 
@@ -291,6 +307,7 @@ int main(int argc, char* argv[]) {
     ("burn-in",po::value<int>()->default_value(0), "Number of Gibbs iterations for burn in")
     ("samples,s",po::value<int>()->default_value(1), "Number of samples used for prediction")
     ("lag,l",po::value<int>()->default_value(0), "Lag for deleted prediction (0=off)")
+    ("train-lag",po::value<int>()->default_value(0), "Lag for deleted training (0=off)")
     ("num-types", po::value<int>()->default_value(256), "Number of types") 
     ("alpha,a", po::value<double>()->default_value(5), "Concentration parameter") 
     ("disc,d", po::value<d_vec>()->default_value(default_discounts,"..."), "Discount parameter(s)") 
